@@ -104,6 +104,7 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
       if (hooks.compactionContextInjector) {
         output.context.push(hooks.compactionContextInjector.inject(_input.sessionID))
       }
+      await hooks.behavioralGovernance?.["experimental.session.compacting"]?.(_input, output)
     },
   }
 }

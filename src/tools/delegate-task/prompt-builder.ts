@@ -1,6 +1,7 @@
 import type { BuildSystemContentInput } from "./types"
 import { buildPlanAgentSystemPrepend, isPlanAgent } from "./constants"
 import { buildSystemContentWithTokenLimit } from "./token-limiter"
+import { getMethodologyChainInjection, hasMethodologyChainInjection } from "./methodology-chain-inject"
 
 const FREE_OR_LOCAL_PROMPT_TOKEN_LIMIT = 24000
 const PLAN_AGENT_PROMPT_APPEND = `
@@ -49,11 +50,22 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
   const effectiveMaxPromptTokens = maxPromptTokens
     ?? (usesFreeOrLocalModel(model) ? FREE_OR_LOCAL_PROMPT_TOKEN_LIMIT : undefined)
 
+  const chainInjection = getMethodologyChainInjection()
+  const existingContent = [skillContent, ...(skillContents ?? []), categoryPromptAppend, agentsContext]
+    .filter(Boolean)
+    .join("")
+  const shouldInjectChain = !hasMethodologyChainInjection(existingContent)
+  const finalCategoryPromptAppend = shouldInjectChain
+    ? categoryPromptAppend
+      ? `${categoryPromptAppend}\n\n${chainInjection}`
+      : chainInjection
+    : categoryPromptAppend
+
   return buildSystemContentWithTokenLimit(
     {
       skillContent,
       skillContents,
-      categoryPromptAppend,
+      categoryPromptAppend: finalCategoryPromptAppend,
       agentsContext: agentsContext ?? planAgentPrepend,
       planAgentPrepend,
     },

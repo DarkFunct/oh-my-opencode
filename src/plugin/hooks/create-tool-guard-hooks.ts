@@ -16,6 +16,8 @@ import {
   createJsonErrorRecoveryHook,
   createTodoDescriptionOverrideHook,
   createWebFetchRedirectGuardHook,
+  createMethodologyChainAuditHook,
+  createBehavioralGovernanceHook,
 } from "../../hooks"
 import {
   getOpenCodeVersion,
@@ -39,6 +41,8 @@ export type ToolGuardHooks = {
   readImageResizer: ReturnType<typeof createReadImageResizerHook> | null
   todoDescriptionOverride: ReturnType<typeof createTodoDescriptionOverrideHook> | null
   webfetchRedirectGuard: ReturnType<typeof createWebFetchRedirectGuardHook> | null
+  methodologyChainAudit: ReturnType<typeof createMethodologyChainAuditHook> | null
+  behavioralGovernance: ReturnType<typeof createBehavioralGovernanceHook> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -123,6 +127,14 @@ export function createToolGuardHooks(args: {
     ? safeHook("webfetch-redirect-guard", () => createWebFetchRedirectGuardHook(ctx))
     : null
 
+  const methodologyChainAudit = isHookEnabled("methodology-chain-audit")
+    ? safeHook("methodology-chain-audit", () => createMethodologyChainAuditHook(ctx))
+    : null
+
+  const behavioralGovernance = isHookEnabled("behavioral-governance")
+    ? safeHook("behavioral-governance", () => createBehavioralGovernanceHook(ctx))
+    : null
+
   return {
     commentChecker,
     toolOutputTruncator,
@@ -137,5 +149,7 @@ export function createToolGuardHooks(args: {
     readImageResizer,
     todoDescriptionOverride,
     webfetchRedirectGuard,
+    methodologyChainAudit,
+    behavioralGovernance,
   }
 }
