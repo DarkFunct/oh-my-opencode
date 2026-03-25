@@ -26,6 +26,7 @@ import {
   createTaskUpdateTool,
   createHashlineEditTool,
   createKGSQueryTool,
+  createKGSArchTool,
 } from "../tools"
 import { getMainSessionID } from "../features/claude-code-session-state"
 import { filterDisabledTools } from "../shared/disabled-tools"
@@ -146,6 +147,7 @@ export function createToolRegistry(args: {
     ...taskToolsRecord,
     ...hashlineToolsRecord,
     ...createKGSQueryTool(ctx),
+    ...createKGSArchTool(ctx),
   }
 
   for (const toolDefinition of Object.values(allTools)) {

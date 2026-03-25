@@ -19,11 +19,11 @@ import {
   createMethodologyChainAuditHook,
   createBehavioralGovernanceHook,
   createKGSGuardHook,
+  createKGSSyncHook,
   createMethodologyPhaseTrackerHook,
   createTaskLifecycleEnforcerHook,
   createPreFlightGuardHook,
   createPostExecutionVerifierHook,
-  createBatchClassificationGuardHook,
   createRetrospectiveTriggerHook,
   createSessionEvidenceCollectorHook,
   createFixLifecycleGateHook,
@@ -53,11 +53,11 @@ export type ToolGuardHooks = {
   methodologyChainAudit: ReturnType<typeof createMethodologyChainAuditHook> | null
   behavioralGovernance: ReturnType<typeof createBehavioralGovernanceHook> | null
   kgsGuard: ReturnType<typeof createKGSGuardHook> | null
+  kgsSync: ReturnType<typeof createKGSSyncHook> | null
   methodologyPhaseTracker: ReturnType<typeof createMethodologyPhaseTrackerHook> | null
   taskLifecycleEnforcer: ReturnType<typeof createTaskLifecycleEnforcerHook> | null
   preFlightGuard: ReturnType<typeof createPreFlightGuardHook> | null
   postExecutionVerifier: ReturnType<typeof createPostExecutionVerifierHook> | null
-  batchClassificationGuard: ReturnType<typeof createBatchClassificationGuardHook> | null
   retrospectiveTrigger: ReturnType<typeof createRetrospectiveTriggerHook> | null
   sessionEvidenceCollector: ReturnType<typeof createSessionEvidenceCollectorHook> | null
   fixLifecycleGate: ReturnType<typeof createFixLifecycleGateHook> | null
@@ -173,10 +173,6 @@ export function createToolGuardHooks(args: {
     ? safeHook("post-execution-verifier", () => createPostExecutionVerifierHook(ctx))
     : null
 
-  const batchClassificationGuard = isHookEnabled("batch-classification-guard")
-    ? safeHook("batch-classification-guard", () => createBatchClassificationGuardHook(ctx))
-    : null
-
   const retrospectiveTrigger = isHookEnabled("retrospective-trigger")
     ? safeHook("retrospective-trigger", () => createRetrospectiveTriggerHook(ctx))
     : null
@@ -187,6 +183,10 @@ export function createToolGuardHooks(args: {
 
   const fixLifecycleGate = isHookEnabled("fix-lifecycle-gate")
     ? safeHook("fix-lifecycle-gate", () => createFixLifecycleGateHook(ctx))
+    : null
+
+  const kgsSync = isHookEnabled("kgs-sync")
+    ? safeHook("kgs-sync", () => createKGSSyncHook(ctx))
     : null
 
   return {
@@ -210,9 +210,9 @@ export function createToolGuardHooks(args: {
     taskLifecycleEnforcer,
     preFlightGuard,
     postExecutionVerifier,
-    batchClassificationGuard,
     retrospectiveTrigger,
     sessionEvidenceCollector,
     fixLifecycleGate,
+    kgsSync,
   }
 }

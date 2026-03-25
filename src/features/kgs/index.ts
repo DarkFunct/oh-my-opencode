@@ -1,1 +1,1 @@
-export { getKGSService, resetKGSService } from "./kgs-service-provider"
+export { getKGSService, getKGSStore, resetKGSService } from "./kgs-service-provider"

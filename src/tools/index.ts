@@ -45,6 +45,7 @@ export {
 } from "./task"
 export { createHashlineEditTool } from "./hashline-edit"
 export { createKGSQueryTool } from "./kgs-query"
+export { createKGSArchTool } from "./kgs-arch"
 
 export function createBackgroundTools(manager: BackgroundManager, client: OpencodeClient): Record<string, ToolDefinition> {
   const outputManager: BackgroundOutputManager = manager

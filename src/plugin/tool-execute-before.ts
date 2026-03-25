@@ -83,11 +83,6 @@ export function createToolExecuteBeforeHandler(args: {
       if (e instanceof Error && e.message.startsWith("[")) throw e
       log("[gaia-hook-error] preFlightGuard before failed", { tool: input.tool, sessionID: input.sessionID, error: e })
     }
-    try { await hooks.batchClassificationGuard?.["tool.execute.before"]?.(input, output) }
-    catch (e) {
-      if (e instanceof Error && e.message.startsWith("[")) throw e
-      log("[gaia-hook-error] batchClassificationGuard before failed", { tool: input.tool, sessionID: input.sessionID, error: e })
-    }
 
     const normalizedToolName = input.tool.toLowerCase()
     if (

@@ -221,7 +221,6 @@ export function createEventHandler(args: {
     await Promise.resolve(hooks.taskLifecycleEnforcer?.event?.(input));
     await Promise.resolve(hooks.preFlightGuard?.event?.(input));
     await Promise.resolve(hooks.postExecutionVerifier?.event?.(input));
-    await Promise.resolve(hooks.batchClassificationGuard?.event?.(input));
     await Promise.resolve(hooks.retrospectiveTrigger?.event?.(input));
     await Promise.resolve(hooks.sessionEvidenceCollector?.event?.(input));
     await Promise.resolve(hooks.fixLifecycleGate?.event?.(input));
