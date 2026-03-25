@@ -87,7 +87,7 @@ export function createMethodologyPhaseTrackerHook(
 			state.executeCallCount >= config.executeWithoutReadThreshold &&
 			now - state.lastReminderTime > cooldownMs
 		) {
-			output.output += buildSkippedReadReminder(state)
+			output.output = (output.output ?? "") + buildSkippedReadReminder(state)
 			updateReminderTime(sessionID)
 			log("[methodology-phase-tracker] Injected Read-skipped reminder", { sessionID })
 		}
@@ -99,15 +99,15 @@ export function createMethodologyPhaseTrackerHook(
 			!state.completedPhases.has("capture") &&
 			now - state.lastReminderTime > cooldownMs
 		) {
-			output.output += buildCaptureReminder(state)
+			output.output = (output.output ?? "") + buildCaptureReminder(state)
 			updateReminderTime(sessionID)
 			log("[methodology-phase-tracker] Injected Capture reminder", { sessionID })
 		}
 
 		if (isTaskCompletionCall(tool, output.metadata)) {
 			if (!state.completedPhases.has("capture") && !isCaptureSignalPresent(output.output)) {
-				resetCycle(sessionID)
-				throw new Error(buildTaskCompletionNoCaptureWarning())
+				output.output = (output.output ?? "") + buildTaskCompletionNoCaptureWarning()
+				log("[methodology-phase-tracker] Task completion without Capture — warning injected", { sessionID })
 			}
 			resetCycle(sessionID)
 		}

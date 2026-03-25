@@ -64,10 +64,23 @@ export function createToolExecuteBeforeHandler(args: {
     await hooks.prometheusMdOnly?.["tool.execute.before"]?.(input, output)
     await hooks.sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output)
     await hooks.atlasHook?.["tool.execute.before"]?.(input, output)
-    await hooks.behavioralGovernance?.["tool.execute.before"]?.(input, output)
-    await hooks.methodologyPhaseTracker?.["tool.execute.before"]?.(input, output)
-    await hooks.preFlightGuard?.["tool.execute.before"]?.(input, output)
-    await hooks.batchClassificationGuard?.["tool.execute.before"]?.(input, output)
+    try { await hooks.behavioralGovernance?.["tool.execute.before"]?.(input, output) }
+    catch (e) {
+      if (e instanceof Error && e.message.startsWith("[")) throw e
+      log("[gaia-hook-error] behavioralGovernance before failed", { tool: input.tool, sessionID: input.sessionID, error: e })
+    }
+    try { await hooks.methodologyPhaseTracker?.["tool.execute.before"]?.(input, output) }
+    catch (e) { log("[gaia-hook-error] methodologyPhaseTracker before failed", { tool: input.tool, sessionID: input.sessionID, error: e }) }
+    try { await hooks.preFlightGuard?.["tool.execute.before"]?.(input, output) }
+    catch (e) {
+      if (e instanceof Error && e.message.startsWith("[")) throw e
+      log("[gaia-hook-error] preFlightGuard before failed", { tool: input.tool, sessionID: input.sessionID, error: e })
+    }
+    try { await hooks.batchClassificationGuard?.["tool.execute.before"]?.(input, output) }
+    catch (e) {
+      if (e instanceof Error && e.message.startsWith("[")) throw e
+      log("[gaia-hook-error] batchClassificationGuard before failed", { tool: input.tool, sessionID: input.sessionID, error: e })
+    }
 
     const normalizedToolName = input.tool.toLowerCase()
     if (

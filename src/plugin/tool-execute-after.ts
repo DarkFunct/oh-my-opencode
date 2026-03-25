@@ -127,13 +127,20 @@ export function createToolExecuteAfterHandler(args: {
       await hooks.hashlineReadEnhancer?.["tool.execute.after"]?.(input, output)
       await hooks.webfetchRedirectGuard?.["tool.execute.after"]?.(input, output)
       await hooks.jsonErrorRecovery?.["tool.execute.after"]?.(input, output)
-      await hooks.methodologyChainAudit?.["tool.execute.after"]?.(input, output)
-      await hooks.behavioralGovernance?.["tool.execute.after"]?.(input, output)
-      await hooks.kgsGuard?.["tool.execute.after"]?.(input, output)
-      await hooks.methodologyPhaseTracker?.["tool.execute.after"]?.(input, output)
-      await hooks.taskLifecycleEnforcer?.["tool.execute.after"]?.(input, output)
-      await hooks.postExecutionVerifier?.["tool.execute.after"]?.(input, output)
-      await hooks.retrospectiveTrigger?.["tool.execute.after"]?.(input, output)
+      try { await hooks.methodologyChainAudit?.["tool.execute.after"]?.(input, output) }
+      catch (e) { log("[gaia-hook-error] methodologyChainAudit after failed", { tool: input.tool, sessionID: input.sessionID, error: e }) }
+      try { await hooks.behavioralGovernance?.["tool.execute.after"]?.(input, output) }
+      catch (e) { log("[gaia-hook-error] behavioralGovernance after failed", { tool: input.tool, sessionID: input.sessionID, error: e }) }
+      try { await hooks.kgsGuard?.["tool.execute.after"]?.(input, output) }
+      catch (e) { log("[gaia-hook-error] kgsGuard after failed", { tool: input.tool, sessionID: input.sessionID, error: e }) }
+      try { await hooks.methodologyPhaseTracker?.["tool.execute.after"]?.(input, output) }
+      catch (e) { log("[gaia-hook-error] methodologyPhaseTracker after failed", { tool: input.tool, sessionID: input.sessionID, error: e }) }
+      try { await hooks.taskLifecycleEnforcer?.["tool.execute.after"]?.(input, output) }
+      catch (e) { log("[gaia-hook-error] taskLifecycleEnforcer after failed", { tool: input.tool, sessionID: input.sessionID, error: e }) }
+      try { await hooks.postExecutionVerifier?.["tool.execute.after"]?.(input, output) }
+      catch (e) { log("[gaia-hook-error] postExecutionVerifier after failed", { tool: input.tool, sessionID: input.sessionID, error: e }) }
+      try { await hooks.retrospectiveTrigger?.["tool.execute.after"]?.(input, output) }
+      catch (e) { log("[gaia-hook-error] retrospectiveTrigger after failed", { tool: input.tool, sessionID: input.sessionID, error: e }) }
     }
 
     if (input.tool === "extract" || input.tool === "discard") {

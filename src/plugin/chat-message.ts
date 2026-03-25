@@ -1,7 +1,7 @@
 import type { OhMyOpenCodeConfig } from "../config"
 import type { PluginContext } from "./types"
 
-import { hasConnectedProvidersCache } from "../shared"
+import { hasConnectedProvidersCache, log } from "../shared"
 import { getSessionModel, setSessionModel } from "../shared/session-model-state"
 import { getMainSessionID, setSessionAgent, subagentSessions } from "../features/claude-code-session-state"
 import { applyUltraworkModelOverrideOnMessage } from "./ultrawork-model-override"
@@ -168,9 +168,12 @@ export function createChatMessageHandler(args: {
     if (hooks.startWork && isStartWorkHookOutput(output)) {
       await hooks.startWork["chat.message"]?.(input, output)
     }
-		await hooks.behavioralGovernance?.["chat.message"]?.(input, output)
-		await hooks.methodologyPhaseTracker?.["chat.message"]?.(input, output)
-		await hooks.taskLifecycleEnforcer?.["chat.message"]?.(input, output)
+		try { await hooks.behavioralGovernance?.["chat.message"]?.(input, output) }
+		catch (e) { log("[gaia-hook-error] behavioralGovernance chatMessage failed", { sessionID: input.sessionID, error: e }) }
+		try { await hooks.methodologyPhaseTracker?.["chat.message"]?.(input, output) }
+		catch (e) { log("[gaia-hook-error] methodologyPhaseTracker chatMessage failed", { sessionID: input.sessionID, error: e }) }
+		try { await hooks.taskLifecycleEnforcer?.["chat.message"]?.(input, output) }
+		catch (e) { log("[gaia-hook-error] taskLifecycleEnforcer chatMessage failed", { sessionID: input.sessionID, error: e }) }
 
     if (!hasConnectedProvidersCache()) {
       pluginContext.client.tui
