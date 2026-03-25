@@ -67,7 +67,7 @@ export function createToolExecuteAfterHandler(config: GovernanceConfig) {
 			}
 
 			if (state.bashSinceCheckpoint >= config.checkpointInterval) {
-				output.output += buildCheckpointReminderSuffix(state.bashSinceCheckpoint)
+				output.output = (output.output ?? "") + buildCheckpointReminderSuffix(state.bashSinceCheckpoint)
 				resetCheckpointCounter(input.sessionID)
 			}
 		}

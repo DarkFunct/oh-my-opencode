@@ -41,7 +41,7 @@ export function createPostExecutionVerifierHook(
 			if (normalized === "task_update" && output.metadata?.status === "completed") {
 				const state = getSessionState(sessionID)
 				if (state.executeStepCount > 0) {
-					output.output += buildCompletionAuditReminder(state)
+					output.output = (output.output ?? "") + buildCompletionAuditReminder(state)
 					log("[post-execution-verifier] Injected completion audit", { sessionID })
 				}
 			}
@@ -68,7 +68,7 @@ export function createPostExecutionVerifierHook(
 			state.executeStepCount % config.verificationReminderInterval === 0 &&
 			now - state.lastVerificationReminder > cooldownMs
 		) {
-			output.output += buildStepVerificationReminder(state)
+			output.output = (output.output ?? "") + buildStepVerificationReminder(state)
 			updateReminderTime(sessionID)
 			log("[post-execution-verifier] Injected PRM verification reminder", {
 				sessionID,

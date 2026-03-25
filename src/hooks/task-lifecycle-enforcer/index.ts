@@ -67,7 +67,7 @@ export function createTaskLifecycleEnforcerHook(
 				state.editWriteCallCount >= config.editWriteBeforeTaskReminder &&
 				now - state.lastReminderTime > cooldownMs
 			) {
-				output.output += buildNoTaskCreatedReminder(state)
+				output.output = (output.output ?? "") + buildNoTaskCreatedReminder(state)
 				updateReminderTime(sessionID)
 				log("[task-lifecycle-enforcer] Injected no-task reminder", {
 					sessionID,

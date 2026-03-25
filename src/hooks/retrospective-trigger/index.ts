@@ -64,7 +64,7 @@ export function createRetrospectiveTriggerHook(_ctx: PluginInput) {
 			state.lastRetrospectiveTime = now
 			state.consecutiveFixAttempts = 0
 
-			output.output += [
+			output.output = (output.output ?? "") + [
 				"\n\n[🔄 过程复盘触发]",
 				`检测到连续 ${state.consecutiveFixAttempts + 3} 次修正尝试。`,
 				"",

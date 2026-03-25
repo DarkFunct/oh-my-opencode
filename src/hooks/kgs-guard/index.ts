@@ -108,7 +108,7 @@ export function createKGSGuardHook(_ctx: PluginInput) {
         })
 
         if (!result.success) {
-          output.output = `${output.output}\n\n[KGS Guard] Knowledge capture failed: ${result.error ?? "unknown"}`
+          output.output = `${output.output ?? ""}\n\n[KGS Guard] Knowledge capture failed: ${result.error ?? "unknown"}`
         }
       } catch (error) {
         log(`${KGS_GUARD_LOG_PREFIX} Unexpected error`, { error })
