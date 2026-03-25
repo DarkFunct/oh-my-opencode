@@ -67,7 +67,9 @@
     "picocolors": "^1.1.1",
     "picomatch": "^4.0.2",
     "vscode-jsonrpc": "^8.2.0",
-    "zod": "^4.1.8"
+    "zod": "^4.1.8",
+    "@gaia/kgs-middleware": "file:../../Gaia/packages/kgs-middleware",
+    "@gaia/omo-hooks": "file:../../Gaia/packages/omo-hooks"
   },
   "devDependencies": {
     "@types/js-yaml": "^4.0.9",
