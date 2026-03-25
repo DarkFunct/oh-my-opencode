@@ -26,6 +26,28 @@ const ARCHITECTURE_FILE_PATTERNS = [
 	/AGENTS\.md/,
 ]
 
+const ENGINEERING_FILE_PATTERNS = [
+	/tsconfig.*\.json/,
+	/package\.json/,
+	/Makefile/,
+	/docker-compose/,
+	/\.env/,
+	/Dockerfile/,
+	/\.eslintrc/,
+	/eslint\.config/,
+	/vitest\.config/,
+	/jest\.config/,
+]
+
+const PHILOSOPHICAL_FILE_PATTERNS = [
+	/_meta\/harness\//,
+	/methodology-chain/,
+	/config\.ya?ml/,
+	/cognitive-governance/,
+	/\.sisyphus\/plans\//,
+	/\.sisyphus\/checkpoints\//,
+]
+
 export function isReadTool(tool: string): boolean {
 	return READ_TOOLS.has(tool.toLowerCase())
 }
@@ -49,12 +71,17 @@ export function detectMethodologyDimension(
 ): MethodologyDimension | null {
 	const normalizedTool = tool.toLowerCase()
 
-	if (READ_TOOLS.has(normalizedTool) || normalizedTool === "bash") {
-		state.dimensionsCovered.add("technical")
-		return "technical"
-	}
-
+	// File-path-specific detection takes priority over generic tool detection
+	// Reading tsconfig.json = engineering, reading _meta/harness/ = philosophical
 	if (filePath) {
+		if (PHILOSOPHICAL_FILE_PATTERNS.some((p) => p.test(filePath))) {
+			state.dimensionsCovered.add("philosophical")
+			return "philosophical"
+		}
+		if (ENGINEERING_FILE_PATTERNS.some((p) => p.test(filePath))) {
+			state.dimensionsCovered.add("engineering")
+			return "engineering"
+		}
 		if (KNOWLEDGE_FILE_PATTERNS.some((p) => p.test(filePath))) {
 			state.dimensionsCovered.add("empirical")
 			return "empirical"
@@ -63,6 +90,11 @@ export function detectMethodologyDimension(
 			state.dimensionsCovered.add("theoretical")
 			return "theoretical"
 		}
+	}
+
+	if (READ_TOOLS.has(normalizedTool) || normalizedTool === "bash") {
+		state.dimensionsCovered.add("technical")
+		return "technical"
 	}
 
 	return null
