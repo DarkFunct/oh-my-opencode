@@ -70,6 +70,10 @@ export function createSessionEvidenceCollectorHook(_ctx: PluginInput) {
 				state.detectedErrors.push(...errors)
 			}
 
+			if (normalized === "bash" && errors.length === 0 && safeOutput.length < 50 && state.lastBuildResult === "fail") {
+				state.lastBuildResult = "unknown"
+			}
+
 			if (isFixAttempt(safeOutput)) {
 				state.fixAttempts++
 				if (filePath) state.lastFixTarget = filePath

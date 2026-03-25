@@ -33,10 +33,10 @@ export function trackBuildResult(
 	state: SessionCognitiveState,
 	output: string,
 ): void {
-	if (/exit code 0/i.test(output) || /success/i.test(output)) {
+	if (/exit code 0/i.test(output) || /compiled?\s+successfully/i.test(output) || /build\s+complete/i.test(output)) {
 		state.lastBuildResult = "success"
 		state.consecutiveFixFailures = 0
-	} else if (/exit code [1-9]/i.test(output) || /error/i.test(output)) {
+	} else if (/exit code [1-9]/i.test(output) || /(?:compilation|type)\s+error/i.test(output) || /tsc.*error\s+TS/i.test(output)) {
 		state.lastBuildResult = "fail"
 	}
 }

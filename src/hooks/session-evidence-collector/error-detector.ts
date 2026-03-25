@@ -4,9 +4,9 @@ const ERROR_PATTERNS: Array<{ regex: RegExp; type: string }> = [
 	{ regex: /TypeError|ReferenceError|SyntaxError|RangeError/i, type: "runtime" },
 	{ regex: /ENOENT|EACCES|EPERM|EISDIR/i, type: "filesystem" },
 	{ regex: /exit code [1-9]\d*/i, type: "process" },
-	{ regex: /Cannot find module|Module not found|not found/i, type: "resolution" },
+	{ regex: /Cannot find module ['"]|Module not found:/i, type: "resolution" },
 	{ regex: /compilation error|type error|tsc.*error/i, type: "compilation" },
-	{ regex: /test failed|assertion error|expect.*to/i, type: "test" },
+	{ regex: /tests?\s+failed|assertion error|AssertionError/i, type: "test" },
 ]
 
 const FIX_SIGNAL_PATTERNS = [
