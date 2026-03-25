@@ -117,7 +117,10 @@ export function createTaskLifecycleEnforcerHook(
 			const statusText = buildChatMessageTaskStatus(state)
 			if (!statusText) return
 
-			output.parts.push({ type: "text", text: String(statusText) })
+			const lastTextPart = output.parts.findLast((p) => p.type === "text" && typeof p.text === "string")
+			if (lastTextPart) {
+				lastTextPart.text = `${lastTextPart.text}\n\n${String(statusText)}`
+			}
 			log("[task-lifecycle-enforcer] Injected task status into chat.message", {
 				sessionID: input.sessionID,
 			})

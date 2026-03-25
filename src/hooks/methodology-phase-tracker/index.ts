@@ -159,7 +159,10 @@ export function createMethodologyPhaseTrackerHook(
 			const statusText = buildChatMessagePhaseStatus(state)
 			if (!statusText) return
 
-			output.parts.push({ type: "text", text: String(statusText) })
+			const lastTextPart = output.parts.findLast((p) => p.type === "text" && typeof p.text === "string")
+			if (lastTextPart) {
+				lastTextPart.text = `${lastTextPart.text}\n\n${String(statusText)}`
+			}
 			log("[methodology-phase-tracker] Injected phase status into chat.message", {
 				sessionID: input.sessionID,
 				phase: state.currentPhase,
