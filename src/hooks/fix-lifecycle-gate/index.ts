@@ -1,6 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { getCognitiveState, deleteCognitiveSession } from "../cognitive-governance-shared/state"
-import { extractFilePath } from "../session-evidence-collector/error-detector"
+import { extractFilePath } from "../session-evidence-collector/structural-signals"
 import { isExecuteTool } from "../session-evidence-collector/evidence-signals"
 import { detectRepeatFix, incrementConsecutiveFailure } from "./repeat-fix-detector"
 import { detectCaptureViolation } from "./capture-gate"

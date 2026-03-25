@@ -1,6 +1,11 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { getCognitiveState, deleteCognitiveSession } from "../cognitive-governance-shared/state"
-import { detectErrors, isFixAttempt, extractFilePath } from "./error-detector"
+import { classifySource } from "./source-classifier"
+import { extractFilePath, extractStructuralSignals } from "./structural-signals"
+import { matchTextSignals, isFixAttempt } from "./text-matcher"
+import { fuseConfidence } from "./confidence-fusion"
+import { detectResetTriggers } from "./reset-triggers"
+import { executeResets } from "./reset-executor"
 import { trackFileEdit, trackReadFile, trackBuildResult, trackTestResult } from "./edit-tracker"
 import { isReadTool, isGrepTool, isExecuteTool, isCaptureTarget, detectMethodologyDimension } from "./evidence-signals"
 import { log } from "../../shared"
@@ -65,13 +70,32 @@ export function createSessionEvidenceCollectorHook(_ctx: PluginInput) {
 				trackTestResult(state, safeOutput)
 			}
 
-			const errors = detectErrors(safeOutput, normalized, filePath)
-			if (errors.length > 0) {
-				state.detectedErrors.push(...errors)
+			const source = classifySource(normalized)
+			const signals = extractStructuralSignals(source, safeOutput, output.metadata)
+			if (filePath) signals.filePath = filePath
+			const textMatches = matchTextSignals(source, safeOutput, signals)
+			const classification = fuseConfidence(signals, textMatches, source)
+
+			if (classification.classification === "error" && classification.confidence >= 0.8) {
+				state.detectedErrors.push({
+					pattern: classification.evidence[0] ?? "unknown",
+					rawMessage: textMatches[0]?.pattern ?? `exitCode=${signals.exitCode}`,
+					tool: normalized,
+					timestamp: Date.now(),
+					filePath,
+					source,
+					confidence: classification.confidence,
+				})
+				state.consecutiveFixFailures++
+			} else if (classification.classification === "info" && classification.confidence >= 0.8) {
+				if (state.consecutiveFixFailures > 0 && isExecuteTool(normalized)) {
+					state.consecutiveFixFailures = 0
+				}
 			}
 
-			if (normalized === "bash" && errors.length === 0 && safeOutput.length < 50 && state.lastBuildResult === "fail") {
-				state.lastBuildResult = "unknown"
+			const triggers = detectResetTriggers(state, classification)
+			if (triggers.length > 0) {
+				executeResets(state, triggers)
 			}
 
 			if (isFixAttempt(safeOutput)) {
