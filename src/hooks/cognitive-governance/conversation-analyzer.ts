@@ -11,6 +11,8 @@ export interface CognitiveAssessment {
 	grepCount: number
 	editedFilesCount: number
 	hasVerification: boolean
+	captureNeeded: boolean
+	captureUrgency: "none" | "reminder" | "warning" | "critical"
 }
 
 const ALL_DIMENSIONS: MethodologyDimension[] = [
@@ -24,6 +26,9 @@ export function assessCognition(state: SessionCognitiveState): CognitiveAssessme
 	const hasVerification =
 		state.lastBuildResult === "success" ||
 		state.lastTestResult === "success"
+
+	const captureNeeded = state.executePhaseActive && !state.captureCompleted && state.fileEditHistory.size >= 3
+	const captureUrgency = deriveCaptureUrgency(state, captureNeeded)
 
 	return {
 		currentLayer: state.currentLayer,
@@ -40,7 +45,20 @@ export function assessCognition(state: SessionCognitiveState): CognitiveAssessme
 		grepCount: state.grepCount,
 		editedFilesCount: state.fileEditHistory.size,
 		hasVerification,
+		captureNeeded,
+		captureUrgency,
 	}
+}
+
+function deriveCaptureUrgency(
+	state: SessionCognitiveState,
+	captureNeeded: boolean,
+): "none" | "reminder" | "warning" | "critical" {
+	if (!captureNeeded) return "none"
+	const rounds = state.roundsSinceCaptureNeeded
+	if (rounds >= 3) return "critical"
+	if (rounds >= 2) return "warning"
+	return "reminder"
 }
 
 export function determineCognitiveLayer(state: SessionCognitiveState): CognitiveLayer {

@@ -22,6 +22,10 @@ export function buildCognitiveDirective(assessment: CognitiveAssessment): string
 		parts.push(buildVerificationReminder(assessment))
 	}
 
+	if (assessment.captureNeeded) {
+		parts.push(buildCaptureEscalation(assessment))
+	}
+
 	if (parts.length === 0) return null
 
 	return [
@@ -56,5 +60,29 @@ function buildVerificationReminder(assessment: CognitiveAssessment): string {
 		"📋 验证提醒",
 		`已编辑 ${assessment.editedFilesCount} 个文件，尚无构建/测试验证。`,
 		"理性层要求：执行后须回到感知层验证结果。",
+	].join("\n")
+}
+
+function buildCaptureEscalation(assessment: CognitiveAssessment): string {
+	if (assessment.captureUrgency === "critical") {
+		return [
+			"🚨 **Capture 阶段严重逾期 — 即将被拦截**",
+			`已编辑 ${assessment.editedFilesCount} 个文件，方法论链 Capture 阶段仍未执行。`,
+			"下一轮对话将被 L2 硬拦截，禁止一切非 Capture 操作。",
+			"**立即执行**：写入 _meta/knowledge/ 下的经验/陷阱/决策文档。",
+		].join("\n")
+	}
+	if (assessment.captureUrgency === "warning") {
+		return [
+			"⚠️ **Capture 阶段逾期**",
+			`已编辑 ${assessment.editedFilesCount} 个文件，Capture 未执行。`,
+			"方法论链: Read → Plan → Execute → **Capture(知识沉淀)**",
+			"请尽快写入经验教训/陷阱/决策到 _meta/knowledge/。",
+		].join("\n")
+	}
+	return [
+		"📝 Capture 提醒",
+		`Execute 阶段已产生实质性变更 (${assessment.editedFilesCount} 文件)。`,
+		"完成当前工作后记得进入 Capture 阶段（知识沉淀）。",
 	].join("\n")
 }

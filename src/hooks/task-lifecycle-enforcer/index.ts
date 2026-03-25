@@ -10,6 +10,7 @@ import {
 	deleteSession,
 } from "./state"
 import { buildNoTaskCreatedReminder, buildCompactionCheckpoint, buildChatMessageTaskStatus } from "./prompts"
+import { extractTaskId, parseTaskOutput } from "./task-output-parser"
 import { log } from "../../shared"
 
 const EDIT_WRITE_TOOLS = new Set(["edit", "write", "bash", "interactive_bash", "ast_grep_replace"])
@@ -36,24 +37,19 @@ export function createTaskLifecycleEnforcerHook(
 			const state = getSessionState(sessionID)
 
 			if (TASK_CREATE_TOOLS.has(normalized)) {
-				const taskId = typeof output.metadata?.id === "string" ? output.metadata.id : undefined
+				const taskId = extractTaskId(output.output)
 				markTaskCreated(sessionID, taskId)
 				log("[task-lifecycle-enforcer] Task created", { sessionID, taskId })
 				return
 			}
 
-			if (normalized === "task" && typeof output.metadata?.action === "string") {
-				if (output.metadata.action === "create") {
-					const taskId = typeof output.metadata?.id === "string" ? output.metadata.id : undefined
-					markTaskCreated(sessionID, taskId)
-				}
-			}
-
 			if (TASK_UPDATE_TOOLS.has(normalized)) {
-				if (output.metadata?.status === "completed") {
-					const taskId = typeof output.metadata?.id === "string" ? output.metadata.id : undefined
-					markTaskCompleted(sessionID, taskId)
-					log("[task-lifecycle-enforcer] Task completed", { sessionID, taskId })
+				const parsed = parseTaskOutput(output.output)
+				if (parsed.status === "completed") {
+					markTaskCompleted(sessionID, parsed.id)
+					log("[task-lifecycle-enforcer] Task completed", { sessionID, taskId: parsed.id })
+				} else if (parsed.status === "in_progress" && parsed.id) {
+					markTaskCreated(sessionID, parsed.id)
 				}
 				return
 			}

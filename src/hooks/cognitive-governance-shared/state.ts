@@ -16,9 +16,13 @@ function createDefaultState(): SessionCognitiveState {
 		readCount: 0,
 		grepCount: 0,
 		toolSequence: [],
+		executePhaseActive: false,
+		captureCompleted: false,
+		captureSignals: [],
 		cognitiveEvidence: [],
 		currentLayer: "perception",
 		dimensionsCovered: new Set(),
+		roundsSinceCaptureNeeded: 0,
 	}
 }
 

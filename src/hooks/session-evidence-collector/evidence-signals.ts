@@ -17,6 +17,7 @@ const KNOWLEDGE_FILE_PATTERNS = [
 	/lessons-learned/,
 	/pitfalls/,
 	/constraints/,
+	/decisions/,
 ]
 
 const ARCHITECTURE_FILE_PATTERNS = [
@@ -35,6 +36,10 @@ export function isGrepTool(tool: string): boolean {
 
 export function isExecuteTool(tool: string): boolean {
 	return EXECUTE_TOOLS.has(tool.toLowerCase())
+}
+
+export function isCaptureTarget(filePath: string): boolean {
+	return KNOWLEDGE_FILE_PATTERNS.some((p) => p.test(filePath))
 }
 
 export function detectMethodologyDimension(

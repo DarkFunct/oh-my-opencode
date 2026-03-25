@@ -3,7 +3,8 @@ import { getCognitiveState, deleteCognitiveSession } from "../cognitive-governan
 import { extractFilePath } from "../session-evidence-collector/error-detector"
 import { isExecuteTool } from "../session-evidence-collector/evidence-signals"
 import { detectRepeatFix, incrementConsecutiveFailure } from "./repeat-fix-detector"
-import { buildBlockMessage } from "./prompts"
+import { detectCaptureViolation } from "./capture-gate"
+import { buildBlockMessage, buildCaptureBlockMessage } from "./prompts"
 import { log } from "../../shared"
 
 export function createFixLifecycleGateHook(_ctx: PluginInput) {
@@ -35,6 +36,17 @@ export function createFixLifecycleGateHook(_ctx: PluginInput) {
 					target: verdict.target,
 				})
 				throw new Error(buildBlockMessage(verdict))
+			}
+
+			const captureVerdict = detectCaptureViolation(state)
+			if (captureVerdict.shouldBlock) {
+				log("[fix-lifecycle-gate] Blocking — capture overdue", {
+					sessionID,
+					tool,
+					roundsPending: captureVerdict.roundsPending,
+					editedFiles: captureVerdict.editedFiles,
+				})
+				throw new Error(buildCaptureBlockMessage(captureVerdict))
 			}
 		} catch (e) {
 			if (e instanceof Error && e.message.startsWith("[🛑")) {

@@ -2,7 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { getCognitiveState, deleteCognitiveSession } from "../cognitive-governance-shared/state"
 import { detectErrors, isFixAttempt, extractFilePath } from "./error-detector"
 import { trackFileEdit, trackReadFile, trackBuildResult, trackTestResult } from "./edit-tracker"
-import { isReadTool, isGrepTool, isExecuteTool, detectMethodologyDimension } from "./evidence-signals"
+import { isReadTool, isGrepTool, isExecuteTool, isCaptureTarget, detectMethodologyDimension } from "./evidence-signals"
 import { log } from "../../shared"
 
 const WRITE_TOOLS = new Set(["edit", "write", "ast_grep_replace", "lsp_rename"])
@@ -53,6 +53,11 @@ export function createSessionEvidenceCollectorHook(_ctx: PluginInput) {
 
 			if (WRITE_TOOLS.has(normalized) && filePath) {
 				trackFileEdit(state, filePath, normalized)
+				state.executePhaseActive = true
+				if (isCaptureTarget(filePath)) {
+					state.captureCompleted = true
+					state.captureSignals.push(filePath)
+				}
 			}
 
 			if (isExecuteTool(normalized)) {

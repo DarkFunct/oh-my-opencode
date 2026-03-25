@@ -1,4 +1,5 @@
 import type { RepeatFixVerdict } from "./repeat-fix-detector"
+import type { CaptureVerdict } from "./capture-gate"
 
 export function buildBlockMessage(verdict: RepeatFixVerdict): string {
 	const lines = [
@@ -30,4 +31,22 @@ export function buildBlockMessage(verdict: RepeatFixVerdict): string {
 	}
 
 	return lines.join("\n")
+}
+
+export function buildCaptureBlockMessage(verdict: CaptureVerdict): string {
+	return [
+		"[🛑 Capture Gate] 知识沉淀未完成 — 操作被拦截",
+		"",
+		`已编辑 ${verdict.editedFiles} 个文件，Execute 阶段已活跃 ${verdict.roundsPending} 轮对话，但 Capture 阶段未执行。`,
+		"",
+		"Harness 方法论链强制要求：Read → Plan → Execute → **Capture**",
+		"",
+		"必须立即完成以下操作：",
+		"1. **写入经验教训** — 更新 _meta/knowledge/lessons-learned.md",
+		"2. **记录新发现的陷阱** — 更新 _meta/knowledge/pitfalls.md（如有）",
+		"3. **记录架构决策** — 更新 _meta/knowledge/decisions.md（如有）",
+		"4. 如确认无新增知识，显式声明「Capture: 无新增知识沉淀」",
+		"",
+		"完成 Capture 后方可继续其他操作。",
+	].join("\n")
 }

@@ -27,6 +27,11 @@ export function createCognitiveGovernanceHook(_ctx: PluginInput) {
 			state.currentLayer = determineCognitiveLayer(state)
 
 			const assessment = assessCognition(state)
+
+			if (assessment.captureNeeded) {
+				state.roundsSinceCaptureNeeded++
+			}
+
 			const directive = buildCognitiveDirective(assessment)
 
 			if (!directive) return

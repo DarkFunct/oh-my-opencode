@@ -49,8 +49,14 @@ export interface SessionCognitiveState {
 	grepCount: number
 	toolSequence: ToolCall[]
 
+	// L1: Capture tracking
+	executePhaseActive: boolean
+	captureCompleted: boolean
+	captureSignals: string[]
+
 	// L3: Cognitive assessment
 	cognitiveEvidence: CognitiveEvidence[]
 	currentLayer: CognitiveLayer
 	dimensionsCovered: Set<MethodologyDimension>
+	roundsSinceCaptureNeeded: number
 }
