@@ -31,7 +31,14 @@ export function createSessionEvidenceCollectorHook(_ctx: PluginInput) {
 			})
 
 			if (isReadTool(normalized)) {
-				if (filePath) trackReadFile(state, filePath)
+				if (filePath) {
+					trackReadFile(state, filePath)
+					state.newFilesReadSinceLastFailure++
+				}
+			}
+
+			if (WRITE_TOOLS.has(normalized)) {
+				state.editsSinceLastVerification++
 			}
 
 			if (isGrepTool(normalized)) {
@@ -75,6 +82,9 @@ export function createSessionEvidenceCollectorHook(_ctx: PluginInput) {
 			if (isExecuteTool(normalized)) {
 				trackBuildResult(state, safeOutput)
 				trackTestResult(state, safeOutput)
+				if (state.lastBuildResult === "success" || state.lastTestResult === "success") {
+					state.editsSinceLastVerification = 0
+				}
 			}
 
 			const source = classifySource(normalized)
@@ -95,6 +105,7 @@ export function createSessionEvidenceCollectorHook(_ctx: PluginInput) {
 					confidence: classification.confidence,
 				})
 				state.consecutiveFixFailures++
+				state.newFilesReadSinceLastFailure = 0
 			} else if (classification.classification === "info" && classification.confidence >= 0.8) {
 				if (state.consecutiveFixFailures > 0 && isExecuteTool(normalized)) {
 					state.consecutiveFixFailures = 0

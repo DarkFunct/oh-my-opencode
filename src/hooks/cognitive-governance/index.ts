@@ -4,6 +4,7 @@ import { getCognitiveState, deleteCognitiveSession } from "../cognitive-governan
 import { assessCognition, determineCognitiveLayer } from "./conversation-analyzer"
 import { buildCognitiveDirective } from "./prompts"
 import { injectCognitiveDirective } from "./cognitive-injector"
+import { detectCognitiveFailureWarn } from "./failure-directives"
 import { log } from "../../shared"
 
 type MessageWithParts = {
@@ -32,7 +33,8 @@ export function createCognitiveGovernanceHook(_ctx: PluginInput) {
 				state.roundsSinceCaptureNeeded++
 			}
 
-			const directive = buildCognitiveDirective(assessment)
+			const failureWarning = detectCognitiveFailureWarn(state)
+			const directive = failureWarning ?? buildCognitiveDirective(assessment)
 
 			if (!directive) return
 

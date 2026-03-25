@@ -4,6 +4,7 @@ import { extractFilePath } from "../session-evidence-collector/structural-signal
 import { isExecuteTool } from "../session-evidence-collector/evidence-signals"
 import { detectRepeatFix, incrementConsecutiveFailure } from "./repeat-fix-detector"
 import { detectCaptureViolation } from "./capture-gate"
+import { detectCognitiveFailureBlock } from "./failure-gate"
 import { buildBlockMessage, buildCaptureBlockMessage } from "./prompts"
 import { log } from "../../shared"
 
@@ -20,6 +21,17 @@ export function createFixLifecycleGateHook(_ctx: PluginInput) {
 		try {
 			const state = getCognitiveState(sessionID)
 			const filePath = extractFilePath(normalized, output.args)
+
+			const cognitiveFailure = detectCognitiveFailureBlock(state)
+			if (cognitiveFailure) {
+				log("[fix-lifecycle-gate] Cognitive failure block", {
+					sessionID,
+					tool,
+					failureId: cognitiveFailure.id,
+					name: cognitiveFailure.name,
+				})
+				throw new Error(cognitiveFailure.directive)
+			}
 
 			if (filePath && state.lastFixTarget === filePath) {
 				incrementConsecutiveFailure(state)

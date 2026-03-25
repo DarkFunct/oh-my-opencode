@@ -159,6 +159,17 @@ export interface ToolCall {
 	filePath?: string
 }
 
+// D-010 Mechanism 3: Cognitive failure detection types
+
+export type CognitiveFailureId = "F1" | "F2" | "F3" | "F4" | "F5"
+
+export interface CognitiveFailure {
+	id: CognitiveFailureId
+	name: string
+	action: "block" | "warn"
+	directive: string
+}
+
 export interface SessionCognitiveState {
 	// L1: Evidence collection
 	detectedErrors: DetectedError[]
@@ -184,6 +195,10 @@ export interface SessionCognitiveState {
 	evidenceRelevance: Map<string, RelevanceResult>
 	pendingExpires: Map<string, PendingExpireEntry>
 	citationMap: Map<string, number>
+
+	// L1: Cognitive failure detection counters
+	editsSinceLastVerification: number
+	newFilesReadSinceLastFailure: number
 
 	// L3: Cognitive assessment
 	cognitiveEvidence: CognitiveEvidence[]

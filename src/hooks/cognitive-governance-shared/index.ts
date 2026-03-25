@@ -23,4 +23,6 @@ export type {
 	RelevanceAction,
 	RelevanceResult,
 	PendingExpireEntry,
+	CognitiveFailureId,
+	CognitiveFailure,
 } from "./types"

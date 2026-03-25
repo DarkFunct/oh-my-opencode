@@ -23,6 +23,8 @@ function createDefaultState(): SessionCognitiveState {
 		evidenceRelevance: new Map(),
 		pendingExpires: new Map(),
 		citationMap: new Map(),
+		editsSinceLastVerification: 0,
+		newFilesReadSinceLastFailure: 0,
 		cognitiveEvidence: [],
 		currentLayer: "perception",
 		dimensionsCovered: new Set(),
