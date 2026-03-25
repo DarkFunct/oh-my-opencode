@@ -97,3 +97,7 @@ export function addDiscoveredFact(sessionID: string, fact: string): void {
 		state.discoveredFacts.push(fact)
 	}
 }
+
+export function deleteSession(sessionID: string): void {
+	sessions.delete(sessionID)
+}

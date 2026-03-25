@@ -141,6 +141,8 @@ export function createToolExecuteAfterHandler(args: {
       catch (e) { log("[gaia-hook-error] postExecutionVerifier after failed", { tool: input.tool, sessionID: input.sessionID, error: e }) }
       try { await hooks.retrospectiveTrigger?.["tool.execute.after"]?.(input, output) }
       catch (e) { log("[gaia-hook-error] retrospectiveTrigger after failed", { tool: input.tool, sessionID: input.sessionID, error: e }) }
+      try { await hooks.sessionEvidenceCollector?.["tool.execute.after"]?.(input, output) }
+      catch (e) { log("[gaia-hook-error] sessionEvidenceCollector after failed", { tool: input.tool, sessionID: input.sessionID, error: e }) }
     }
 
     if (input.tool === "extract" || input.tool === "discard") {

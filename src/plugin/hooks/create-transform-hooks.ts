@@ -5,6 +5,7 @@ import {
   createClaudeCodeHooksHook,
   createKeywordDetectorHook,
   createThinkingBlockValidatorHook,
+  createCognitiveGovernanceHook,
 } from "../../hooks"
 import {
   contextCollector,
@@ -17,6 +18,7 @@ export type TransformHooks = {
   keywordDetector: ReturnType<typeof createKeywordDetectorHook> | null
   contextInjectorMessagesTransform: ReturnType<typeof createContextInjectorMessagesTransformHook>
   thinkingBlockValidator: ReturnType<typeof createThinkingBlockValidatorHook> | null
+  cognitiveGovernance: ReturnType<typeof createCognitiveGovernanceHook> | null
 }
 
 export function createTransformHooks(args: {
@@ -63,10 +65,19 @@ export function createTransformHooks(args: {
       )
     : null
 
+  const cognitiveGovernance = isHookEnabled("cognitive-governance")
+    ? safeCreateHook(
+        "cognitive-governance",
+        () => createCognitiveGovernanceHook(ctx),
+        { enabled: safeHookEnabled },
+      )
+    : null
+
   return {
     claudeCodeHooks,
     keywordDetector,
     contextInjectorMessagesTransform,
     thinkingBlockValidator,
+    cognitiveGovernance,
   }
 }

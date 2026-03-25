@@ -223,6 +223,10 @@ export function createEventHandler(args: {
     await Promise.resolve(hooks.postExecutionVerifier?.event?.(input));
     await Promise.resolve(hooks.batchClassificationGuard?.event?.(input));
     await Promise.resolve(hooks.retrospectiveTrigger?.event?.(input));
+    await Promise.resolve(hooks.sessionEvidenceCollector?.event?.(input));
+    await Promise.resolve(hooks.fixLifecycleGate?.event?.(input));
+    await Promise.resolve(hooks.cognitiveGovernance?.event?.(input));
+    await Promise.resolve(hooks.behavioralGovernance?.event?.(input));
   };
 
   const recentSyntheticIdles = new Map<string, number>();

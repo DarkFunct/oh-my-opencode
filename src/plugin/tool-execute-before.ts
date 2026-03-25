@@ -69,6 +69,13 @@ export function createToolExecuteBeforeHandler(args: {
       if (e instanceof Error && e.message.startsWith("[")) throw e
       log("[gaia-hook-error] behavioralGovernance before failed", { tool: input.tool, sessionID: input.sessionID, error: e })
     }
+    try { await hooks.sessionEvidenceCollector?.["tool.execute.before"]?.(input, output) }
+    catch (e) { log("[gaia-hook-error] sessionEvidenceCollector before failed", { tool: input.tool, sessionID: input.sessionID, error: e }) }
+    try { await hooks.fixLifecycleGate?.["tool.execute.before"]?.(input, output) }
+    catch (e) {
+      if (e instanceof Error && e.message.startsWith("[")) throw e
+      log("[gaia-hook-error] fixLifecycleGate before failed", { tool: input.tool, sessionID: input.sessionID, error: e })
+    }
     try { await hooks.methodologyPhaseTracker?.["tool.execute.before"]?.(input, output) }
     catch (e) { log("[gaia-hook-error] methodologyPhaseTracker before failed", { tool: input.tool, sessionID: input.sessionID, error: e }) }
     try { await hooks.preFlightGuard?.["tool.execute.before"]?.(input, output) }

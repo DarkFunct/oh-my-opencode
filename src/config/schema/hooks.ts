@@ -61,6 +61,9 @@ export const HookNameSchema = z.enum([
   "post-execution-verifier",
   "batch-classification-guard",
   "retrospective-trigger",
+  "session-evidence-collector",
+  "fix-lifecycle-gate",
+  "cognitive-governance",
 ])
 
 export type HookName = z.infer<typeof HookNameSchema>

@@ -25,6 +25,8 @@ import {
   createPostExecutionVerifierHook,
   createBatchClassificationGuardHook,
   createRetrospectiveTriggerHook,
+  createSessionEvidenceCollectorHook,
+  createFixLifecycleGateHook,
 } from "../../hooks"
 import {
   getOpenCodeVersion,
@@ -57,6 +59,8 @@ export type ToolGuardHooks = {
   postExecutionVerifier: ReturnType<typeof createPostExecutionVerifierHook> | null
   batchClassificationGuard: ReturnType<typeof createBatchClassificationGuardHook> | null
   retrospectiveTrigger: ReturnType<typeof createRetrospectiveTriggerHook> | null
+  sessionEvidenceCollector: ReturnType<typeof createSessionEvidenceCollectorHook> | null
+  fixLifecycleGate: ReturnType<typeof createFixLifecycleGateHook> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -177,6 +181,14 @@ export function createToolGuardHooks(args: {
     ? safeHook("retrospective-trigger", () => createRetrospectiveTriggerHook(ctx))
     : null
 
+  const sessionEvidenceCollector = isHookEnabled("session-evidence-collector")
+    ? safeHook("session-evidence-collector", () => createSessionEvidenceCollectorHook(ctx))
+    : null
+
+  const fixLifecycleGate = isHookEnabled("fix-lifecycle-gate")
+    ? safeHook("fix-lifecycle-gate", () => createFixLifecycleGateHook(ctx))
+    : null
+
   return {
     commentChecker,
     toolOutputTruncator,
@@ -200,5 +212,7 @@ export function createToolGuardHooks(args: {
     postExecutionVerifier,
     batchClassificationGuard,
     retrospectiveTrigger,
+    sessionEvidenceCollector,
+    fixLifecycleGate,
   }
 }
