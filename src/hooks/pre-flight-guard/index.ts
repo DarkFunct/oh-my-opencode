@@ -29,36 +29,42 @@ export function createPreFlightGuardHook(
 	): Promise<void> => {
 		const { tool, sessionID } = input
 		const normalized = tool.toLowerCase()
-		const state = getSessionState(sessionID)
 
-		if (READ_TOOLS.has(normalized)) {
-			incrementRead(sessionID)
-			if (state.firstExecuteBlocked && state.readToolCount >= config.minReadBeforeExecute) {
-				resetCycle(sessionID)
-				log("[pre-flight-guard] Cycle re-armed — sufficient reads after block", {
-					sessionID,
-				})
+		try {
+			const state = getSessionState(sessionID)
+
+			if (READ_TOOLS.has(normalized)) {
+				incrementRead(sessionID)
+				if (state.firstExecuteBlocked && state.readToolCount >= config.minReadBeforeExecute) {
+					resetCycle(sessionID)
+					log("[pre-flight-guard] Cycle re-armed — sufficient reads after block", {
+						sessionID,
+					})
+				}
+				return
 			}
+
+			if (PLAN_TOOLS.has(normalized) || normalized === "task") {
+				incrementPlan(sessionID)
+				return
+			}
+
+			if (!EXECUTE_TOOLS.has(normalized)) return
+
+			if (state.readToolCount >= config.minReadBeforeExecute) return
+
+			if (state.firstExecuteBlocked) return
+
+			markBlocked(sessionID)
+			log("[pre-flight-guard] Execute without Read detected", {
+				sessionID,
+				tool,
+				readCount: state.readToolCount,
+			})
+		} catch (e) {
+			log("[gaia-hook-safe] preFlightGuard before failed", { error: e })
 			return
 		}
-
-		if (PLAN_TOOLS.has(normalized) || normalized === "task") {
-			incrementPlan(sessionID)
-			return
-		}
-
-		if (!EXECUTE_TOOLS.has(normalized)) return
-
-		if (state.readToolCount >= config.minReadBeforeExecute) return
-
-		if (state.firstExecuteBlocked) return
-
-		markBlocked(sessionID)
-		log("[pre-flight-guard] Execute without Read detected", {
-			sessionID,
-			tool,
-			readCount: state.readToolCount,
-		})
 
 		throw new Error(
 			[

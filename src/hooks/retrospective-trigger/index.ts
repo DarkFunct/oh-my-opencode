@@ -39,46 +39,52 @@ export function createRetrospectiveTriggerHook(_ctx: PluginInput) {
 		input: { tool: string; sessionID: string; callID: string },
 		output: { title: string; output: string; metadata: Record<string, unknown> },
 	): Promise<void> => {
-		const { tool, sessionID } = input
-		const normalized = tool.toLowerCase()
-		const state = getState(sessionID)
+		try {
+			if (!output) return
+			const { tool, sessionID } = input
+			const normalized = tool.toLowerCase()
+			const state = getState(sessionID)
+			const safeOutput = output.output ?? ""
 
-		if ((normalized === "edit" || normalized === "write" || normalized === "bash") &&
-			isFixAttempt(output.output)) {
-			state.consecutiveFixAttempts++
-			state.lastFixTool = tool
-		} else if (normalized === "edit" || normalized === "write" || normalized === "bash") {
-			state.consecutiveFixAttempts = 0
-		}
+			if ((normalized === "edit" || normalized === "write" || normalized === "bash") &&
+				isFixAttempt(safeOutput)) {
+				state.consecutiveFixAttempts++
+				state.lastFixTool = tool
+			} else if (normalized === "edit" || normalized === "write" || normalized === "bash") {
+				state.consecutiveFixAttempts = 0
+			}
 
-		if (normalized === "task_update" && output.metadata?.status === "completed") {
-			state.taskCompletionCount++
-		}
+			if (normalized === "task_update" && output.metadata?.status === "completed") {
+				state.taskCompletionCount++
+			}
 
-		const now = Date.now()
-		const shouldTrigger =
-			state.consecutiveFixAttempts >= 3 &&
-			now - state.lastRetrospectiveTime > RETRO_COOLDOWN_MS
+			const now = Date.now()
+			const shouldTrigger =
+				state.consecutiveFixAttempts >= 3 &&
+				now - state.lastRetrospectiveTime > RETRO_COOLDOWN_MS
 
-		if (shouldTrigger) {
-			state.lastRetrospectiveTime = now
-			state.consecutiveFixAttempts = 0
+			if (shouldTrigger) {
+				state.lastRetrospectiveTime = now
+				state.consecutiveFixAttempts = 0
 
-			output.output = (output.output ?? "") + [
-				"\n\n[🔄 过程复盘触发]",
-				`检测到连续 ${state.consecutiveFixAttempts + 3} 次修正尝试。`,
-				"",
-				"Harness 要求触发过程复盘：",
-				"1. 回顾最近的修正链 — 根因是什么？",
-				"2. 是否在修复症状而非根因？",
-				"3. 是否需要回退到已知良好状态重新开始？",
-				"4. 记录教训到 _meta/knowledge/lessons-learned.md",
-			].join("\n")
+				output.output = safeOutput + [
+					"\n\n[🔄 过程复盘触发]",
+					`检测到连续 ${state.consecutiveFixAttempts + 3} 次修正尝试。`,
+					"",
+					"Harness 要求触发过程复盘：",
+					"1. 回顾最近的修正链 — 根因是什么？",
+					"2. 是否在修复症状而非根因？",
+					"3. 是否需要回退到已知良好状态重新开始？",
+					"4. 记录教训到 _meta/knowledge/lessons-learned.md",
+				].join("\n")
 
-			log("[retrospective-trigger] Triggered retrospective", {
-				sessionID,
-				fixAttempts: state.consecutiveFixAttempts + 3,
-			})
+				log("[retrospective-trigger] Triggered retrospective", {
+					sessionID,
+					fixAttempts: state.consecutiveFixAttempts + 3,
+				})
+			}
+		} catch (e) {
+			log("[gaia-hook-safe] retrospectiveTrigger after failed", { error: e })
 		}
 	}
 

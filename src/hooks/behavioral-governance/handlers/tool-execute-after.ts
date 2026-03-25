@@ -54,44 +54,49 @@ export function createToolExecuteAfterHandler(config: GovernanceConfig) {
 		input: { tool: string; sessionID: string; callID: string },
 		output: { title: string; output: string; metadata: Record<string, unknown> } | undefined,
 	): Promise<void> => {
-		if (!output) return
+		try {
+			if (!output) return
 
-		const state = getSessionState(input.sessionID)
-		const toolLower = input.tool.toLowerCase()
+			const state = getSessionState(input.sessionID)
+			const toolLower = input.tool.toLowerCase()
+			const safeOutput = output.output ?? ""
 
-		if (toolLower === "bash") {
-			if (detectBashFailure(output.output)) {
-				recordFailure(input.sessionID, output.output.slice(0, 300))
-			} else {
-				resetFailures(input.sessionID)
+			if (toolLower === "bash") {
+				if (detectBashFailure(safeOutput)) {
+					recordFailure(input.sessionID, safeOutput.slice(0, 300))
+				} else {
+					resetFailures(input.sessionID)
+				}
+
+				if (state.bashSinceCheckpoint >= config.checkpointInterval) {
+					output.output = safeOutput + buildCheckpointReminderSuffix(state.bashSinceCheckpoint)
+					resetCheckpointCounter(input.sessionID)
+				}
 			}
 
-			if (state.bashSinceCheckpoint >= config.checkpointInterval) {
-				output.output = (output.output ?? "") + buildCheckpointReminderSuffix(state.bashSinceCheckpoint)
-				resetCheckpointCounter(input.sessionID)
+			if (toolLower === "question") {
+				const authLevel = detectAuthorizationResponse(safeOutput)
+				if (authLevel) {
+					grantSourceCodeAuth(input.sessionID, authLevel as "once" | "task" | "session")
+					log("[behavioral-governance] Source code authorization granted", {
+						sessionID: input.sessionID,
+						level: authLevel,
+					})
+				}
 			}
-		}
 
-		if (toolLower === "question") {
-			const authLevel = detectAuthorizationResponse(output.output)
-			if (authLevel) {
-				grantSourceCodeAuth(input.sessionID, authLevel as "once" | "task" | "session")
-				log("[behavioral-governance] Source code authorization granted", {
+			if (toolLower === "edit" || toolLower === "write") {
+				consumeOnceAuthorization(input.sessionID)
+			}
+
+			if (!state.cognitiveAnalysisCompleted && detectCognitiveAnalysis(safeOutput)) {
+				markCognitiveAnalysisComplete(input.sessionID)
+				log("[behavioral-governance] Cognitive analysis detected — gate opened", {
 					sessionID: input.sessionID,
-					level: authLevel,
 				})
 			}
-		}
-
-		if (toolLower === "edit" || toolLower === "write") {
-			consumeOnceAuthorization(input.sessionID)
-		}
-
-		if (!state.cognitiveAnalysisCompleted && detectCognitiveAnalysis(output.output)) {
-			markCognitiveAnalysisComplete(input.sessionID)
-			log("[behavioral-governance] Cognitive analysis detected — gate opened", {
-				sessionID: input.sessionID,
-			})
+		} catch (e) {
+			log("[gaia-hook-safe] behavioralGovernance after failed", { error: e })
 		}
 	}
 }

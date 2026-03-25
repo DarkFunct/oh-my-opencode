@@ -29,29 +29,38 @@ export function createBatchClassificationGuardHook(_ctx: PluginInput) {
 		input: { tool: string; sessionID: string; callID: string },
 		output: { args: Record<string, unknown> },
 	): Promise<void> => {
-		const { tool, sessionID } = input
-		const normalized = tool.toLowerCase()
+		let batchCount: number | null = null
+		let isBatchSignal = false
 
-		if (normalized !== "task" && normalized !== "bash") return
+		try {
+			const { tool, sessionID } = input
+			const normalized = tool.toLowerCase()
 
-		const argsString = JSON.stringify(output.args)
+			if (normalized !== "task" && normalized !== "bash") return
 
-		const batchCount = extractBatchCount(argsString)
-		const isBatchSignal = hasBatchSignal(argsString)
+			const safeArgs = output?.args ?? {}
+			const argsString = JSON.stringify(safeArgs)
 
-		if (!isBatchSignal && (batchCount === null || batchCount < BATCH_THRESHOLD)) return
+			batchCount = extractBatchCount(argsString)
+			isBatchSignal = hasBatchSignal(argsString)
 
-		const lastWarned = sessionWarned.get(sessionID) ?? 0
-		if (Date.now() - lastWarned < 120_000) return
+			if (!isBatchSignal && (batchCount === null || batchCount < BATCH_THRESHOLD)) return
 
-		sessionWarned.set(sessionID, Date.now())
+			const lastWarned = sessionWarned.get(sessionID) ?? 0
+			if (Date.now() - lastWarned < 120_000) return
 
-		log("[batch-classification-guard] Batch operation detected", {
-			sessionID,
-			tool,
-			batchCount,
-			isBatchSignal,
-		})
+			sessionWarned.set(sessionID, Date.now())
+
+			log("[batch-classification-guard] Batch operation detected", {
+				sessionID,
+				tool,
+				batchCount,
+				isBatchSignal,
+			})
+		} catch (e) {
+			log("[gaia-hook-safe] batch-classification-guard toolExecuteBefore failed", { error: e })
+			return
+		}
 
 		throw new Error(
 			[

@@ -34,46 +34,51 @@ export function createPostExecutionVerifierHook(
 		input: { tool: string; sessionID: string; callID: string },
 		output: { title: string; output: string; metadata: Record<string, unknown> },
 	): Promise<void> => {
-		const { tool, sessionID } = input
-		const normalized = tool.toLowerCase()
+		try {
+			if (!output) return
+			const { tool, sessionID } = input
+			const normalized = tool.toLowerCase()
 
-		if (!EXECUTE_TOOLS.has(normalized)) {
-			if (normalized === "task_update" && output.metadata?.status === "completed") {
-				const state = getSessionState(sessionID)
-				if (state.executeStepCount > 0) {
-					output.output = (output.output ?? "") + buildCompletionAuditReminder(state)
-					log("[post-execution-verifier] Injected completion audit", { sessionID })
+			if (!EXECUTE_TOOLS.has(normalized)) {
+				if (normalized === "task_update" && output.metadata?.status === "completed") {
+					const state = getSessionState(sessionID)
+					if (state.executeStepCount > 0) {
+						output.output = (output.output ?? "") + buildCompletionAuditReminder(state)
+						log("[post-execution-verifier] Injected completion audit", { sessionID })
+					}
 				}
+				return
 			}
-			return
-		}
 
-		incrementStep(sessionID)
+			incrementStep(sessionID)
 
-		if (normalized === "bash" || normalized === "interactive_bash") {
-			incrementBash(sessionID)
-		}
+			if (normalized === "bash" || normalized === "interactive_bash") {
+				incrementBash(sessionID)
+			}
 
-		const filePath = extractFilePath(output.metadata)
-		if (filePath) {
-			addModifiedFile(sessionID, filePath)
-		}
+			const filePath = extractFilePath(output.metadata ?? {})
+			if (filePath) {
+				addModifiedFile(sessionID, filePath)
+			}
 
-		const state = getSessionState(sessionID)
-		const now = Date.now()
-		const cooldownMs = config.reminderCooldownSeconds * 1000
+			const state = getSessionState(sessionID)
+			const now = Date.now()
+			const cooldownMs = config.reminderCooldownSeconds * 1000
 
-		if (
-			state.executeStepCount > 0 &&
-			state.executeStepCount % config.verificationReminderInterval === 0 &&
-			now - state.lastVerificationReminder > cooldownMs
-		) {
-			output.output = (output.output ?? "") + buildStepVerificationReminder(state)
-			updateReminderTime(sessionID)
-			log("[post-execution-verifier] Injected PRM verification reminder", {
-				sessionID,
-				stepCount: state.executeStepCount,
-			})
+			if (
+				state.executeStepCount > 0 &&
+				state.executeStepCount % config.verificationReminderInterval === 0 &&
+				now - state.lastVerificationReminder > cooldownMs
+			) {
+				output.output = (output.output ?? "") + buildStepVerificationReminder(state)
+				updateReminderTime(sessionID)
+				log("[post-execution-verifier] Injected PRM verification reminder", {
+					sessionID,
+					stepCount: state.executeStepCount,
+				})
+			}
+		} catch (e) {
+			log("[gaia-hook-safe] postExecutionVerifier after failed", { error: e })
 		}
 	}
 

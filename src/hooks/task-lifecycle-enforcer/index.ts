@@ -29,51 +29,56 @@ export function createTaskLifecycleEnforcerHook(
 		input: { tool: string; sessionID: string; callID: string },
 		output: { title: string; output: string; metadata: Record<string, unknown> },
 	): Promise<void> => {
-		const { tool, sessionID } = input
-		const normalized = tool.toLowerCase()
-		const state = getSessionState(sessionID)
+		try {
+			if (!output) return
+			const { tool, sessionID } = input
+			const normalized = tool.toLowerCase()
+			const state = getSessionState(sessionID)
 
-		if (TASK_CREATE_TOOLS.has(normalized)) {
-			const taskId = typeof output.metadata?.id === "string" ? output.metadata.id : undefined
-			markTaskCreated(sessionID, taskId)
-			log("[task-lifecycle-enforcer] Task created", { sessionID, taskId })
-			return
-		}
-
-		if (normalized === "task" && typeof output.metadata?.action === "string") {
-			if (output.metadata.action === "create") {
+			if (TASK_CREATE_TOOLS.has(normalized)) {
 				const taskId = typeof output.metadata?.id === "string" ? output.metadata.id : undefined
 				markTaskCreated(sessionID, taskId)
+				log("[task-lifecycle-enforcer] Task created", { sessionID, taskId })
+				return
 			}
-		}
 
-		if (TASK_UPDATE_TOOLS.has(normalized)) {
-			if (output.metadata?.status === "completed") {
-				const taskId = typeof output.metadata?.id === "string" ? output.metadata.id : undefined
-				markTaskCompleted(sessionID, taskId)
-				log("[task-lifecycle-enforcer] Task completed", { sessionID, taskId })
+			if (normalized === "task" && typeof output.metadata?.action === "string") {
+				if (output.metadata.action === "create") {
+					const taskId = typeof output.metadata?.id === "string" ? output.metadata.id : undefined
+					markTaskCreated(sessionID, taskId)
+				}
 			}
-			return
-		}
 
-		if (EDIT_WRITE_TOOLS.has(normalized)) {
-			incrementEditWrite(sessionID)
-
-			const now = Date.now()
-			const cooldownMs = config.reminderCooldownSeconds * 1000
-
-			if (
-				!state.hasCreatedTask &&
-				state.editWriteCallCount >= config.editWriteBeforeTaskReminder &&
-				now - state.lastReminderTime > cooldownMs
-			) {
-				output.output = (output.output ?? "") + buildNoTaskCreatedReminder(state)
-				updateReminderTime(sessionID)
-				log("[task-lifecycle-enforcer] Injected no-task reminder", {
-					sessionID,
-					editWriteCount: state.editWriteCallCount,
-				})
+			if (TASK_UPDATE_TOOLS.has(normalized)) {
+				if (output.metadata?.status === "completed") {
+					const taskId = typeof output.metadata?.id === "string" ? output.metadata.id : undefined
+					markTaskCompleted(sessionID, taskId)
+					log("[task-lifecycle-enforcer] Task completed", { sessionID, taskId })
+				}
+				return
 			}
+
+			if (EDIT_WRITE_TOOLS.has(normalized)) {
+				incrementEditWrite(sessionID)
+
+				const now = Date.now()
+				const cooldownMs = config.reminderCooldownSeconds * 1000
+
+				if (
+					!state.hasCreatedTask &&
+					state.editWriteCallCount >= config.editWriteBeforeTaskReminder &&
+					now - state.lastReminderTime > cooldownMs
+				) {
+					output.output = (output.output ?? "") + buildNoTaskCreatedReminder(state)
+					updateReminderTime(sessionID)
+					log("[task-lifecycle-enforcer] Injected no-task reminder", {
+						sessionID,
+						editWriteCount: state.editWriteCallCount,
+					})
+				}
+			}
+		} catch (e) {
+			log("[gaia-hook-safe] taskLifecycleEnforcer after failed", { error: e })
 		}
 	}
 
@@ -81,11 +86,16 @@ export function createTaskLifecycleEnforcerHook(
 		input: { sessionID: string },
 		output: { context: string[] },
 	): Promise<void> => {
-		const state = getSessionState(input.sessionID)
-		output.context.push(buildCompactionCheckpoint(state))
-		log("[task-lifecycle-enforcer] Compaction checkpoint injected", {
-			sessionID: input.sessionID,
-		})
+		try {
+			if (!output?.context || !Array.isArray(output.context)) return
+			const state = getSessionState(input.sessionID)
+			output.context.push(buildCompactionCheckpoint(state))
+			log("[task-lifecycle-enforcer] Compaction checkpoint injected", {
+				sessionID: input.sessionID,
+			})
+		} catch (e) {
+			log("[gaia-hook-safe] taskLifecycleEnforcer compacting failed", { error: e })
+		}
 	}
 
 	const event = async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
@@ -101,14 +111,19 @@ export function createTaskLifecycleEnforcerHook(
 		input: { sessionID: string },
 		output: { parts: Array<{ type: string; text?: string; [key: string]: unknown }> },
 	): Promise<void> => {
-		const state = getSessionState(input.sessionID)
-		const statusText = buildChatMessageTaskStatus(state)
-		if (!statusText) return
+		try {
+			if (!output?.parts || !Array.isArray(output.parts)) return
+			const state = getSessionState(input.sessionID)
+			const statusText = buildChatMessageTaskStatus(state)
+			if (!statusText) return
 
-		output.parts.push({ type: "text", text: statusText })
-		log("[task-lifecycle-enforcer] Injected task status into chat.message", {
-			sessionID: input.sessionID,
-		})
+			output.parts.push({ type: "text", text: String(statusText) })
+			log("[task-lifecycle-enforcer] Injected task status into chat.message", {
+				sessionID: input.sessionID,
+			})
+		} catch (e) {
+			log("[gaia-hook-safe] taskLifecycleEnforcer chatMessage failed", { error: e })
+		}
 	}
 
 	return {

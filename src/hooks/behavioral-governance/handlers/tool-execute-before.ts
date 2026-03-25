@@ -28,82 +28,90 @@ export function createToolExecuteBeforeHandler(config: GovernanceConfig) {
 		input: { tool: string; sessionID: string; callID: string },
 		output: { args: Record<string, unknown>; message?: string },
 	): Promise<void> => {
-		const state = getSessionState(input.sessionID)
-		const toolLower = input.tool.toLowerCase()
+		try {
+			const safeArgs = output?.args ?? {}
+			const state = getSessionState(input.sessionID)
+			const toolLower = input.tool.toLowerCase()
 
-		if (READ_TOOLS.has(toolLower)) {
-			incrementReadCount(input.sessionID)
-			return
-		}
-
-		if (toolLower !== "bash" && toolLower !== "edit" && toolLower !== "write") {
-			return
-		}
-
-		const sourceCheck = detectSourceCodeModification(input.tool, output.args, config)
-		if (sourceCheck.detected) {
-			const auth = state.sourceCodeAuth
-			if (auth.level === "none") {
-				log("[behavioral-governance] Source code modification blocked — no authorization", {
-					sessionID: input.sessionID,
-					filePath: sourceCheck.filePath,
-				})
-				throw new Error(buildSourceAuthPrompt(
-					sourceCheck.filePath ?? "unknown",
-					sourceCheck.operationType ?? "unknown",
-				))
+			if (READ_TOOLS.has(toolLower)) {
+				incrementReadCount(input.sessionID)
+				return
 			}
-		}
 
-		if (state.consecutiveFailures >= config.failureThreshold) {
-			log("[behavioral-governance] Circuit breaker triggered", {
-				sessionID: input.sessionID,
-				failures: state.consecutiveFailures,
-			})
-			throw new Error(buildCircuitBreakerPrompt(
-				state.consecutiveFailures,
-				state.lastFailureContext,
-			))
-		}
+			if (toolLower !== "bash" && toolLower !== "edit" && toolLower !== "write") {
+				return
+			}
 
-		if (toolLower === "bash") {
-			const command = typeof output.args.command === "string" ? output.args.command : ""
-
-			if (state.readCount > 0 || !isDiagnosticBashCommand(command)) {
-				const ratio = state.readCount > 0 ? state.bashCount / state.readCount : state.bashCount
-				if (ratio > config.ratioThreshold && state.bashCount >= 6) {
-					const required = Math.ceil(state.bashCount / config.ratioThreshold) - state.readCount
-					log("[behavioral-governance] Execution ratio exceeded", {
+			const sourceCheck = detectSourceCodeModification(input.tool, safeArgs, config)
+			if (sourceCheck.detected) {
+				const auth = state.sourceCodeAuth
+				if (auth.level === "none") {
+					log("[behavioral-governance] Source code modification blocked — no authorization", {
 						sessionID: input.sessionID,
-						bash: state.bashCount,
-						read: state.readCount,
-						ratio,
+						filePath: sourceCheck.filePath,
 					})
-					throw new Error(buildExecutionRatioPrompt(
-						state.bashCount,
-						state.readCount,
-						config.ratioThreshold,
-						Math.max(required, 2),
+					throw new Error(buildSourceAuthPrompt(
+						sourceCheck.filePath ?? "unknown",
+						sourceCheck.operationType ?? "unknown",
 					))
 				}
 			}
 
-			if (!state.cognitiveAnalysisCompleted && state.bashCount === 0 && isDiagnosticBashCommand(command)) {
-				log("[behavioral-governance] Cognitive gate triggered — first diagnostic bash without analysis", {
+			if (state.consecutiveFailures >= config.failureThreshold) {
+				log("[behavioral-governance] Circuit breaker triggered", {
 					sessionID: input.sessionID,
+					failures: state.consecutiveFailures,
 				})
-				throw new Error(buildCognitiveGatePrompt())
+				throw new Error(buildCircuitBreakerPrompt(
+					state.consecutiveFailures,
+					state.lastFailureContext,
+				))
 			}
 
-			incrementBashCount(input.sessionID)
-		} else {
-			if (!state.cognitiveAnalysisCompleted && state.readCount === 0) {
-				log("[behavioral-governance] Cognitive gate triggered — first edit/write without prior read", {
-					sessionID: input.sessionID,
-					tool: toolLower,
-				})
-				throw new Error(buildCognitiveGatePrompt())
+			if (toolLower === "bash") {
+				const command = typeof safeArgs.command === "string" ? safeArgs.command : ""
+
+				if (state.readCount > 0 || !isDiagnosticBashCommand(command)) {
+					const ratio = state.readCount > 0 ? state.bashCount / state.readCount : state.bashCount
+					if (ratio > config.ratioThreshold && state.bashCount >= 6) {
+						const required = Math.ceil(state.bashCount / config.ratioThreshold) - state.readCount
+						log("[behavioral-governance] Execution ratio exceeded", {
+							sessionID: input.sessionID,
+							bash: state.bashCount,
+							read: state.readCount,
+							ratio,
+						})
+						throw new Error(buildExecutionRatioPrompt(
+							state.bashCount,
+							state.readCount,
+							config.ratioThreshold,
+							Math.max(required, 2),
+						))
+					}
+				}
+
+				if (!state.cognitiveAnalysisCompleted && state.bashCount === 0 && isDiagnosticBashCommand(command)) {
+					log("[behavioral-governance] Cognitive gate triggered — first diagnostic bash without analysis", {
+						sessionID: input.sessionID,
+					})
+					throw new Error(buildCognitiveGatePrompt())
+				}
+
+				incrementBashCount(input.sessionID)
+			} else {
+				if (!state.cognitiveAnalysisCompleted && state.readCount === 0) {
+					log("[behavioral-governance] Cognitive gate triggered — first edit/write without prior read", {
+						sessionID: input.sessionID,
+						tool: toolLower,
+					})
+					throw new Error(buildCognitiveGatePrompt())
+				}
 			}
+		} catch (e) {
+			if (e instanceof Error && e.message.startsWith("[")) {
+				throw e
+			}
+			log("[gaia-hook-safe] behavioral-governance toolExecuteBefore failed", { error: e })
 		}
 	}
 }
