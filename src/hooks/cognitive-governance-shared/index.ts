@@ -17,4 +17,10 @@ export type {
 	ResetTrigger,
 	ResetScope,
 	ResetAuditEntry,
+	StructuralScoring,
+	SemanticEvaluation,
+	FusionConfig,
+	RelevanceAction,
+	RelevanceResult,
+	PendingExpireEntry,
 } from "./types"

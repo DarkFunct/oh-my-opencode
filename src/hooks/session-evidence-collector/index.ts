@@ -8,6 +8,7 @@ import { detectResetTriggers } from "./reset-triggers"
 import { executeResets } from "./reset-executor"
 import { trackFileEdit, trackReadFile, trackBuildResult, trackTestResult } from "./edit-tracker"
 import { isReadTool, isGrepTool, isExecuteTool, isCaptureTarget, detectMethodologyDimension } from "./evidence-signals"
+import { scoreAllEvidences } from "../context-relevance-scorer"
 import { log } from "../../shared"
 
 const WRITE_TOOLS = new Set(["edit", "write", "ast_grep_replace", "lsp_rename"])
@@ -54,7 +55,13 @@ export function createSessionEvidenceCollectorHook(_ctx: PluginInput) {
 			const state = getCognitiveState(sessionID)
 			const safeOutput = output.output ?? ""
 
+			state.roundCounter++
+
 			const filePath = extractFilePath(normalized, output.metadata)
+
+			if (filePath) {
+				state.citationMap.set(filePath, (state.citationMap.get(filePath) ?? 0) + 1)
+			}
 
 			if (WRITE_TOOLS.has(normalized) && filePath) {
 				trackFileEdit(state, filePath, normalized)
@@ -82,6 +89,7 @@ export function createSessionEvidenceCollectorHook(_ctx: PluginInput) {
 					rawMessage: textMatches[0]?.pattern ?? `exitCode=${signals.exitCode}`,
 					tool: normalized,
 					timestamp: Date.now(),
+					round: state.roundCounter,
 					filePath,
 					source,
 					confidence: classification.confidence,
@@ -97,6 +105,8 @@ export function createSessionEvidenceCollectorHook(_ctx: PluginInput) {
 			if (triggers.length > 0) {
 				executeResets(state, triggers)
 			}
+
+			scoreAllEvidences(state)
 
 			if (isFixAttempt(safeOutput)) {
 				state.fixAttempts++

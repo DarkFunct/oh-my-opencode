@@ -57,10 +57,20 @@ function deriveCaptureUrgency(
 	return "reminder"
 }
 
+function buildErrorId(error: DetectedError): string {
+	const pathPart = error.filePath ?? "unknown"
+	return `${error.tool}:${pathPart}:${error.timestamp}`
+}
+
 function isErrorLikelyResolved(
 	error: DetectedError,
 	state: SessionCognitiveState,
 ): boolean {
+	const relevance = state.evidenceRelevance.get(buildErrorId(error))
+	if (relevance && (relevance.action === "expire")) {
+		return true
+	}
+
 	if (error.filePath) {
 		const editEntry = state.fileEditHistory.get(error.filePath)
 		return !!editEntry && editEntry.lastEditTimestamp >= error.timestamp

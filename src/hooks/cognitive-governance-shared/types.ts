@@ -79,11 +79,62 @@ export interface ResetAuditEntry {
 	evidence: string
 }
 
+// D-010 Mechanism 1: Dual-track fusion scoring types
+
+export interface StructuralScoring {
+	recency: number // max(0, 1 - (currentRound - evidenceRound) / decayWindow)
+	citation: number // citationCount / maxExpectedCitations, capped at 1.0
+	superseded: number // 0 if newer version exists for same file, 1 otherwise
+}
+
+export interface SemanticEvaluation {
+	taskRelevance: number // 0-1
+	causalContribution: number // 0-1
+	evidence: string[] // ≥1 entry
+}
+
+export interface FusionConfig {
+	weights: {
+		structural: number // default 0.6
+		semantic: number // default 0.4
+	}
+	thresholds: {
+		keep: number // ≥ this: keep + inject (default 0.6)
+		noInject: number // ≥ this but < keep: keep but stop injecting (default 0.3)
+	}
+	expireGuard: {
+		margin: number // expire threshold protection margin (default 0.05)
+		maxDeferRounds: number // max deferred rounds (default 2)
+	}
+	semanticSampling: {
+		enabled: boolean
+		interval: number // every N rounds
+	}
+	fallback: "structural_only"
+}
+
+export type RelevanceAction = "keep" | "no_inject" | "pending_expire" | "expire"
+
+export interface RelevanceResult {
+	composite: number
+	action: RelevanceAction
+	trackUsed: "dual" | "structural_only"
+}
+
+export interface PendingExpireEntry {
+	contentId: string
+	firstExpireScore: number
+	deferredRounds: number
+	trackUsed: "dual" | "structural_only"
+	reason: string
+}
+
 export interface DetectedError {
 	pattern: string
 	rawMessage: string
 	tool: string
 	timestamp: number
+	round?: number // round when this error was detected
 	filePath?: string
 	source?: SourceType
 	confidence?: number
@@ -127,6 +178,12 @@ export interface SessionCognitiveState {
 	executePhaseActive: boolean
 	captureCompleted: boolean
 	captureSignals: string[]
+
+	// L1.5: Context relevance scoring
+	roundCounter: number
+	evidenceRelevance: Map<string, RelevanceResult>
+	pendingExpires: Map<string, PendingExpireEntry>
+	citationMap: Map<string, number>
 
 	// L3: Cognitive assessment
 	cognitiveEvidence: CognitiveEvidence[]
