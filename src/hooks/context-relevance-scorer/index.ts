@@ -1,8 +1,11 @@
-import type { SessionCognitiveState } from "../cognitive-governance-shared/types"
+import type { SessionCognitiveState, RelevanceAction } from "../cognitive-governance-shared/types"
 import { computeStructuralScoring } from "./structural-scoring"
 import { evaluateSemantic } from "./semantic-evaluator"
 import { evaluate } from "./fusion"
 import { DEFAULT_FUSION_CONFIG } from "./scoring-config"
+import { log } from "../../shared"
+
+const AUDIT_ACTIONS: Set<RelevanceAction> = new Set(["expire", "pending_expire", "no_inject"])
 
 export function scoreAllEvidences(state: SessionCognitiveState): void {
 	const config = DEFAULT_FUSION_CONFIG
@@ -32,6 +35,18 @@ export function scoreAllEvidences(state: SessionCognitiveState): void {
 			}
 		} else if (result.action === "expire" || result.action === "keep") {
 			state.pendingExpires.delete(errorId)
+		}
+
+		if (AUDIT_ACTIONS.has(result.action)) {
+			log("[gaia-relevance]", {
+				action: result.action,
+				errorId,
+				score: result.composite,
+				track: result.trackUsed,
+				round: state.roundCounter,
+				filePath: error.filePath,
+				deferredRounds: pending?.deferredRounds,
+			})
 		}
 	}
 }
