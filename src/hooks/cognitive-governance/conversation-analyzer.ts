@@ -1,4 +1,4 @@
-import type { SessionCognitiveState, CognitiveLayer, MethodologyDimension } from "../cognitive-governance-shared/types"
+import type { SessionCognitiveState, CognitiveLayer, MethodologyDimension, DetectedError } from "../cognitive-governance-shared/types"
 
 export interface CognitiveAssessment {
 	currentLayer: CognitiveLayer
@@ -35,11 +35,7 @@ export function assessCognition(state: SessionCognitiveState): CognitiveAssessme
 		dimensionsCovered: covered,
 		dimensionsGap: gap,
 		errorCount: state.detectedErrors.length,
-		unresolvedErrors: state.detectedErrors.filter((e) => {
-			if (!e.filePath) return true
-			const editEntry = state.fileEditHistory.get(e.filePath)
-			return !editEntry || editEntry.lastEditTimestamp < e.timestamp
-		}).length,
+		unresolvedErrors: state.detectedErrors.filter((e) => !isErrorLikelyResolved(e, state)).length,
 		fixAttempts: state.fixAttempts,
 		readCount: state.readCount,
 		grepCount: state.grepCount,
@@ -59,6 +55,23 @@ function deriveCaptureUrgency(
 	if (rounds >= 3) return "critical"
 	if (rounds >= 2) return "warning"
 	return "reminder"
+}
+
+function isErrorLikelyResolved(
+	error: DetectedError,
+	state: SessionCognitiveState,
+): boolean {
+	if (error.filePath) {
+		const editEntry = state.fileEditHistory.get(error.filePath)
+		return !!editEntry && editEntry.lastEditTimestamp >= error.timestamp
+	}
+	if (error.pattern === "compilation" || error.pattern === "process" || error.pattern === "resolution") {
+		return state.lastBuildResult === "success"
+	}
+	if (error.pattern === "test") {
+		return state.lastTestResult === "success"
+	}
+	return false
 }
 
 export function determineCognitiveLayer(state: SessionCognitiveState): CognitiveLayer {
