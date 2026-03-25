@@ -1,6 +1,7 @@
 export interface ChainSignalResult {
   readDetected: boolean
   planDetected: boolean
+  executeDetected: boolean
   captureDetected: boolean
   missingSignals: string[]
 }
@@ -23,6 +24,14 @@ const CAPTURE_PATTERNS = [
   /(?:新增|添加|更新|补充|修正).{0,20}(?:pitfalls?|lessons?|decisions?|经验|教训|陷阱|文档|源文档)/i,
 ]
 
+const EXECUTE_PATTERNS = [
+  /(?:执行|实现|实施|完成|修改|创建|编辑|写入|部署)[:：]/,
+  /(?:Execute|Implementation|Implemented|Created|Modified|Deployed|Built)[:：\s]/i,
+  /(?:已|成功).{0,10}(?:执行|完成|实现|创建|修改|部署|写入)/,
+  /(?:文件|代码|配置).{0,10}(?:已修改|已创建|已更新|已写入)/,
+  /(?:lsp_diagnostics|typecheck|编译|build).{0,20}(?:通过|成功|零错误|clean|pass)/i,
+]
+
 function matchesAny(text: string, patterns: RegExp[]): boolean {
   return patterns.some(p => p.test(text))
 }
@@ -32,11 +41,13 @@ export function detectChainSignals(output: string): ChainSignalResult {
 
   const readDetected = matchesAny(output, READ_PATTERNS)
   const planDetected = matchesAny(output, PLAN_PATTERNS)
+  const executeDetected = matchesAny(output, EXECUTE_PATTERNS)
   const captureDetected = matchesAny(output, CAPTURE_PATTERNS)
 
   if (!readDetected) missing.push("Read（文档引用）")
   if (!planDetected) missing.push("Plan（方案陈述）")
+  if (!executeDetected) missing.push("Execute（执行结果/验证记录）")
   if (!captureDetected) missing.push("Capture（知识沉淀声明）")
 
-  return { readDetected, planDetected, captureDetected, missingSignals: missing }
+  return { readDetected, planDetected, executeDetected, captureDetected, missingSignals: missing }
 }

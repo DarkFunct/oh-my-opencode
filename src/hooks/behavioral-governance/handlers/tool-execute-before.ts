@@ -55,36 +55,6 @@ export function createToolExecuteBeforeHandler(config: GovernanceConfig) {
 			}
 		}
 
-		if (toolLower !== "bash") return
-
-		const command = typeof output.args.command === "string" ? output.args.command : ""
-
-		if (state.readCount > 0 || !isDiagnosticBashCommand(command)) {
-			const ratio = state.readCount > 0 ? state.bashCount / state.readCount : state.bashCount
-			if (ratio > config.ratioThreshold && state.bashCount >= 6) {
-				const required = Math.ceil(state.bashCount / config.ratioThreshold) - state.readCount
-				log("[behavioral-governance] Execution ratio exceeded", {
-					sessionID: input.sessionID,
-					bash: state.bashCount,
-					read: state.readCount,
-					ratio,
-				})
-				throw new Error(buildExecutionRatioPrompt(
-					state.bashCount,
-					state.readCount,
-					config.ratioThreshold,
-					Math.max(required, 2),
-				))
-			}
-		}
-
-		if (!state.cognitiveAnalysisCompleted && state.bashCount === 0 && isDiagnosticBashCommand(command)) {
-			log("[behavioral-governance] Cognitive gate triggered — first diagnostic bash without analysis", {
-				sessionID: input.sessionID,
-			})
-			throw new Error(buildCognitiveGatePrompt())
-		}
-
 		if (state.consecutiveFailures >= config.failureThreshold) {
 			log("[behavioral-governance] Circuit breaker triggered", {
 				sessionID: input.sessionID,
@@ -96,6 +66,44 @@ export function createToolExecuteBeforeHandler(config: GovernanceConfig) {
 			))
 		}
 
-		incrementBashCount(input.sessionID)
+		if (toolLower === "bash") {
+			const command = typeof output.args.command === "string" ? output.args.command : ""
+
+			if (state.readCount > 0 || !isDiagnosticBashCommand(command)) {
+				const ratio = state.readCount > 0 ? state.bashCount / state.readCount : state.bashCount
+				if (ratio > config.ratioThreshold && state.bashCount >= 6) {
+					const required = Math.ceil(state.bashCount / config.ratioThreshold) - state.readCount
+					log("[behavioral-governance] Execution ratio exceeded", {
+						sessionID: input.sessionID,
+						bash: state.bashCount,
+						read: state.readCount,
+						ratio,
+					})
+					throw new Error(buildExecutionRatioPrompt(
+						state.bashCount,
+						state.readCount,
+						config.ratioThreshold,
+						Math.max(required, 2),
+					))
+				}
+			}
+
+			if (!state.cognitiveAnalysisCompleted && state.bashCount === 0 && isDiagnosticBashCommand(command)) {
+				log("[behavioral-governance] Cognitive gate triggered — first diagnostic bash without analysis", {
+					sessionID: input.sessionID,
+				})
+				throw new Error(buildCognitiveGatePrompt())
+			}
+
+			incrementBashCount(input.sessionID)
+		} else {
+			if (!state.cognitiveAnalysisCompleted && state.readCount === 0) {
+				log("[behavioral-governance] Cognitive gate triggered — first edit/write without prior read", {
+					sessionID: input.sessionID,
+					tool: toolLower,
+				})
+				throw new Error(buildCognitiveGatePrompt())
+			}
+		}
 	}
 }

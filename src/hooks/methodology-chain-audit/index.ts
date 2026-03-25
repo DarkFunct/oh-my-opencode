@@ -44,6 +44,7 @@ export function createMethodologyChainAuditHook(_ctx: PluginInput) {
         agent,
         readDetected: result.readDetected,
         planDetected: result.planDetected,
+        executeDetected: result.executeDetected,
         captureDetected: result.captureDetected,
         missingCount: result.missingSignals.length,
       })
