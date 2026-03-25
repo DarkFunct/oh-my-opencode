@@ -54,6 +54,13 @@ export const HookNameSchema = z.enum([
   "webfetch-redirect-guard",
   "methodology-chain-audit",
   "behavioral-governance",
+  "kgs-guard",
+  "methodology-phase-tracker",
+  "task-lifecycle-enforcer",
+  "pre-flight-guard",
+  "post-execution-verifier",
+  "batch-classification-guard",
+  "retrospective-trigger",
 ])
 
 export type HookName = z.infer<typeof HookNameSchema>

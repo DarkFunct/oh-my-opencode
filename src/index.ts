@@ -105,6 +105,8 @@ const OhMyOpenCodePlugin: Plugin = async (ctx) => {
         output.context.push(hooks.compactionContextInjector.inject(_input.sessionID))
       }
       await hooks.behavioralGovernance?.["experimental.session.compacting"]?.(_input, output)
+      await hooks.methodologyPhaseTracker?.["experimental.session.compacting"]?.(_input, output)
+      await hooks.taskLifecycleEnforcer?.["experimental.session.compacting"]?.(_input, output)
     },
   }
 }

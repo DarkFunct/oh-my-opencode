@@ -129,6 +129,11 @@ export function createToolExecuteAfterHandler(args: {
       await hooks.jsonErrorRecovery?.["tool.execute.after"]?.(input, output)
       await hooks.methodologyChainAudit?.["tool.execute.after"]?.(input, output)
       await hooks.behavioralGovernance?.["tool.execute.after"]?.(input, output)
+      await hooks.kgsGuard?.["tool.execute.after"]?.(input, output)
+      await hooks.methodologyPhaseTracker?.["tool.execute.after"]?.(input, output)
+      await hooks.taskLifecycleEnforcer?.["tool.execute.after"]?.(input, output)
+      await hooks.postExecutionVerifier?.["tool.execute.after"]?.(input, output)
+      await hooks.retrospectiveTrigger?.["tool.execute.after"]?.(input, output)
     }
 
     if (input.tool === "extract" || input.tool === "discard") {

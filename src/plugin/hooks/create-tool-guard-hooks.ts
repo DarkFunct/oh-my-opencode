@@ -18,6 +18,13 @@ import {
   createWebFetchRedirectGuardHook,
   createMethodologyChainAuditHook,
   createBehavioralGovernanceHook,
+  createKGSGuardHook,
+  createMethodologyPhaseTrackerHook,
+  createTaskLifecycleEnforcerHook,
+  createPreFlightGuardHook,
+  createPostExecutionVerifierHook,
+  createBatchClassificationGuardHook,
+  createRetrospectiveTriggerHook,
 } from "../../hooks"
 import {
   getOpenCodeVersion,
@@ -43,6 +50,13 @@ export type ToolGuardHooks = {
   webfetchRedirectGuard: ReturnType<typeof createWebFetchRedirectGuardHook> | null
   methodologyChainAudit: ReturnType<typeof createMethodologyChainAuditHook> | null
   behavioralGovernance: ReturnType<typeof createBehavioralGovernanceHook> | null
+  kgsGuard: ReturnType<typeof createKGSGuardHook> | null
+  methodologyPhaseTracker: ReturnType<typeof createMethodologyPhaseTrackerHook> | null
+  taskLifecycleEnforcer: ReturnType<typeof createTaskLifecycleEnforcerHook> | null
+  preFlightGuard: ReturnType<typeof createPreFlightGuardHook> | null
+  postExecutionVerifier: ReturnType<typeof createPostExecutionVerifierHook> | null
+  batchClassificationGuard: ReturnType<typeof createBatchClassificationGuardHook> | null
+  retrospectiveTrigger: ReturnType<typeof createRetrospectiveTriggerHook> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -135,6 +149,34 @@ export function createToolGuardHooks(args: {
     ? safeHook("behavioral-governance", () => createBehavioralGovernanceHook(ctx))
     : null
 
+  const kgsGuard = isHookEnabled("kgs-guard")
+    ? safeHook("kgs-guard", () => createKGSGuardHook(ctx))
+    : null
+
+  const methodologyPhaseTracker = isHookEnabled("methodology-phase-tracker")
+    ? safeHook("methodology-phase-tracker", () => createMethodologyPhaseTrackerHook(ctx))
+    : null
+
+  const taskLifecycleEnforcer = isHookEnabled("task-lifecycle-enforcer")
+    ? safeHook("task-lifecycle-enforcer", () => createTaskLifecycleEnforcerHook(ctx))
+    : null
+
+  const preFlightGuard = isHookEnabled("pre-flight-guard")
+    ? safeHook("pre-flight-guard", () => createPreFlightGuardHook(ctx))
+    : null
+
+  const postExecutionVerifier = isHookEnabled("post-execution-verifier")
+    ? safeHook("post-execution-verifier", () => createPostExecutionVerifierHook(ctx))
+    : null
+
+  const batchClassificationGuard = isHookEnabled("batch-classification-guard")
+    ? safeHook("batch-classification-guard", () => createBatchClassificationGuardHook(ctx))
+    : null
+
+  const retrospectiveTrigger = isHookEnabled("retrospective-trigger")
+    ? safeHook("retrospective-trigger", () => createRetrospectiveTriggerHook(ctx))
+    : null
+
   return {
     commentChecker,
     toolOutputTruncator,
@@ -151,5 +193,12 @@ export function createToolGuardHooks(args: {
     webfetchRedirectGuard,
     methodologyChainAudit,
     behavioralGovernance,
+    kgsGuard,
+    methodologyPhaseTracker,
+    taskLifecycleEnforcer,
+    preFlightGuard,
+    postExecutionVerifier,
+    batchClassificationGuard,
+    retrospectiveTrigger,
   }
 }

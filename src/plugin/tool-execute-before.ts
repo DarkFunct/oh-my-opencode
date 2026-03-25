@@ -65,6 +65,9 @@ export function createToolExecuteBeforeHandler(args: {
     await hooks.sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output)
     await hooks.atlasHook?.["tool.execute.before"]?.(input, output)
     await hooks.behavioralGovernance?.["tool.execute.before"]?.(input, output)
+    await hooks.methodologyPhaseTracker?.["tool.execute.before"]?.(input, output)
+    await hooks.preFlightGuard?.["tool.execute.before"]?.(input, output)
+    await hooks.batchClassificationGuard?.["tool.execute.before"]?.(input, output)
 
     const normalizedToolName = input.tool.toLowerCase()
     if (

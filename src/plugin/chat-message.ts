@@ -168,7 +168,9 @@ export function createChatMessageHandler(args: {
     if (hooks.startWork && isStartWorkHookOutput(output)) {
       await hooks.startWork["chat.message"]?.(input, output)
     }
-    await hooks.behavioralGovernance?.["chat.message"]?.(input, output)
+		await hooks.behavioralGovernance?.["chat.message"]?.(input, output)
+		await hooks.methodologyPhaseTracker?.["chat.message"]?.(input, output)
+		await hooks.taskLifecycleEnforcer?.["chat.message"]?.(input, output)
 
     if (!hasConnectedProvidersCache()) {
       pluginContext.client.tui
