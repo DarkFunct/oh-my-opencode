@@ -35,6 +35,9 @@ export function createSessionEvidenceCollectorHook(_ctx: PluginInput) {
 					trackReadFile(state, filePath)
 					state.newFilesReadSinceLastFailure++
 				}
+				if (normalized === "lsp_diagnostics") {
+					state.editsSinceLastVerification = 0
+				}
 			}
 
 			if (WRITE_TOOLS.has(normalized)) {

@@ -1,8 +1,6 @@
 import type { SessionCognitiveState, CognitiveFailure } from "../cognitive-governance-shared/types"
 import { computeErrorTraceDepth, isSameDirectionRetry } from "../session-evidence-collector/failure-signals"
 
-const F3_BLOCK_THRESHOLD = 5
-
 export function detectCognitiveFailureBlock(
 	state: SessionCognitiveState,
 ): CognitiveFailure | null {
@@ -19,15 +17,6 @@ export function detectCognitiveFailureBlock(
 				action: "block",
 				directive: buildF1Directive(uniqueFiles),
 			}
-		}
-	}
-
-	if (state.editsSinceLastVerification >= F3_BLOCK_THRESHOLD) {
-		return {
-			id: "F3",
-			name: "Unverified Changes",
-			action: "block",
-			directive: buildF3BlockDirective(state.editsSinceLastVerification),
 		}
 	}
 
@@ -49,13 +38,6 @@ function buildF1Directive(errorSourceFiles: string[]): string {
 		`[🛑 F1: 盲目执行] 检测到错误来源文件未被读取。` +
 		`错误涉及: ${fileList}。` +
 		`请先 read 这些文件追踪错误传播路径，再执行修复。`
-	)
-}
-
-function buildF3BlockDirective(editCount: number): string {
-	return (
-		`[🛑 F3: 改而不验] 已连续编辑 ${editCount} 个文件未运行验证。` +
-		`执行 lsp_diagnostics 或 typecheck/build 确认无回归后再继续。`
 	)
 }
 

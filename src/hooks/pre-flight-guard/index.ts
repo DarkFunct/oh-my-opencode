@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { PreFlightConfig } from "./types"
 import { DEFAULT_PRE_FLIGHT_CONFIG } from "./types"
 import { getSessionState, incrementRead, incrementPlan, markBlocked, resetCycle, deleteSession } from "./state"
+import { isReadOnlyBashCommand } from "../../shared/bash-command-classifier"
 import { log } from "../../shared"
 
 const READ_TOOLS = new Set([
@@ -50,6 +51,14 @@ export function createPreFlightGuardHook(
 			}
 
 			if (!EXECUTE_TOOLS.has(normalized)) return
+
+			if (normalized === "bash") {
+				const command = typeof _output.args.command === "string" ? _output.args.command : ""
+				if (isReadOnlyBashCommand(command)) {
+					incrementRead(sessionID)
+					return
+				}
+			}
 
 			if (state.readToolCount >= config.minReadBeforeExecute) return
 

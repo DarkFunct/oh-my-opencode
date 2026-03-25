@@ -26,7 +26,7 @@ import {
 	buildCompactionStateCheckpoint,
 	buildChatMessagePhaseStatus,
 } from "./prompts"
-import { log } from "../../shared"
+import { log, isReadOnlyBashCommand, isVerificationBashCommand } from "../../shared"
 
 export function createMethodologyPhaseTrackerHook(
 	_ctx: PluginInput,
@@ -47,16 +47,24 @@ export function createMethodologyPhaseTrackerHook(
 
 			incrementToolCall(sessionID)
 
-			const phase = classifyToolPhase(tool)
+			const toolLower = tool.toLowerCase()
+			const isBashNonWrite =
+				(toolLower === "bash" || toolLower === "interactive_bash") &&
+				(() => {
+					const cmd = typeof _output.args.command === "string" ? _output.args.command : ""
+					return isReadOnlyBashCommand(cmd) || isVerificationBashCommand(cmd)
+				})()
+
+			const phase = isBashNonWrite ? "read" : classifyToolPhase(tool)
 			if (phase) {
 				transitionPhase(sessionID, phase, tool)
 			}
 
-			if (isReadTool(tool)) {
+			if (isReadTool(tool) || isBashNonWrite) {
 				incrementReadCall(sessionID)
 			}
 
-			if (isExecuteTool(tool)) {
+			if (isExecuteTool(tool) && !isBashNonWrite) {
 				incrementExecuteCall(sessionID)
 			}
 

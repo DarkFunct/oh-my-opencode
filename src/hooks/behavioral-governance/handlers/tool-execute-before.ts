@@ -5,7 +5,7 @@ import { buildCognitiveGatePrompt } from "../prompts/cognitive-gate"
 import { buildCircuitBreakerPrompt } from "../prompts/circuit-breaker"
 import { buildSourceAuthPrompt } from "../prompts/source-auth"
 import { buildExecutionRatioPrompt } from "../prompts/execution-ratio"
-import { log } from "../../../shared"
+import { log, isReadOnlyBashCommand, isVerificationBashCommand } from "../../../shared"
 
 const READ_TOOLS = new Set([
 	"read", "grep", "glob", "ast_grep_search",
@@ -70,6 +70,11 @@ export function createToolExecuteBeforeHandler(config: GovernanceConfig) {
 
 			if (toolLower === "bash") {
 				const command = typeof safeArgs.command === "string" ? safeArgs.command : ""
+
+				if (isReadOnlyBashCommand(command) || isVerificationBashCommand(command)) {
+					incrementReadCount(input.sessionID)
+					return
+				}
 
 				if (state.readCount > 0 || !isDiagnosticBashCommand(command)) {
 					const ratio = state.readCount > 0 ? state.bashCount / state.readCount : state.bashCount

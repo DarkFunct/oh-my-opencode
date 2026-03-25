@@ -1,7 +1,7 @@
 import type { SessionCognitiveState } from "../cognitive-governance-shared/types"
 import { computeFixTargetConsistency, hasReadKnowledgeFiles } from "../session-evidence-collector/failure-signals"
 
-const F3_WARN_THRESHOLD = 3
+const F3_WARN_THRESHOLD = 4
 
 export function detectCognitiveFailureWarn(
 	state: SessionCognitiveState,
