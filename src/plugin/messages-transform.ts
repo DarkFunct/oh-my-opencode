@@ -24,5 +24,9 @@ export function createMessagesTransformHandler(args: {
     await args.hooks.cognitiveGovernance?.[
       "experimental.chat.messages.transform"
     ]?.(input, output)
+
+    await args.hooks.knowledgeProtection?.[
+      "experimental.chat.messages.transform"
+    ]?.(input, output)
   }
 }

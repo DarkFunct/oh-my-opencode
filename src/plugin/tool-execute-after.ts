@@ -145,6 +145,8 @@ export function createToolExecuteAfterHandler(args: {
       catch (e) { log("[gaia-hook-error] sessionEvidenceCollector after failed", { tool: input.tool, sessionID: input.sessionID, error: e }) }
       try { await hooks.kgsSync?.["tool.execute.after"]?.(input, output) }
       catch (e) { log("[gaia-hook-error] kgsSync after failed", { tool: input.tool, sessionID: input.sessionID, error: e }) }
+      try { await hooks.knowledgeProtection?.["tool.execute.after"]?.(input, output) }
+      catch (e) { log("[gaia-hook-error] knowledgeProtection after failed", { tool: input.tool, sessionID: input.sessionID, error: e }) }
     }
 
     if (input.tool === "extract" || input.tool === "discard") {
