@@ -11,6 +11,7 @@ import {
   generateTaskId,
 } from "../../features/claude-tasks/storage";
 import { syncTaskTodoUpdate } from "./todo-sync";
+import { canCreatePersistentTask } from "../../shared/task-ownership-policy";
 
 export function createTaskCreateTool(
   config: Partial<OhMyOpenCodeConfig>,
@@ -63,6 +64,10 @@ async function handleCreate(
   context: { sessionID: string },
 ): Promise<string> {
   try {
+    if (!canCreatePersistentTask(context.sessionID)) {
+      return JSON.stringify({ error: "subagent_denied", message: "Subagent sessions cannot create persistent tasks" });
+    }
+
     const validatedArgs = TaskCreateInputSchema.parse(args);
     const taskDir = getTaskDir(config);
     const lock = acquireLock(taskDir);

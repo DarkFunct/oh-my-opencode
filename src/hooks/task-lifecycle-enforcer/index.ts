@@ -13,6 +13,7 @@ import {
 import { buildNoTaskCreatedReminder, buildCompactionCheckpoint, buildChatMessageTaskStatus } from "./prompts"
 import { extractTaskId, parseTaskOutput } from "./task-output-parser"
 import { log } from "../../shared"
+import { isSubagentSession } from "../../shared/task-ownership-policy"
 
 type MessageWithParts = {
 	info: Message
@@ -43,6 +44,9 @@ export function createTaskLifecycleEnforcerHook(
 		try {
 			if (!output) return
 			const { tool, sessionID } = input
+
+			if (isSubagentSession(sessionID)) return
+
 			const normalized = tool.toLowerCase()
 			const state = getSessionState(sessionID)
 

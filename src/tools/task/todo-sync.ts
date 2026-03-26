@@ -1,6 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin";
 import { log } from "../../shared/logger";
 import type { Task } from "../../features/claude-tasks/types.ts";
+import { saveOpenCodeTodos, type OpenCodeTodo } from "../../hooks/claude-code-hooks/todo";
 
 export interface TodoInfo {
   id?: string;
@@ -77,10 +78,24 @@ async function resolveTodoWriter(): Promise<TodoWriter | null> {
     if (typeof update === "function") {
       return update as TodoWriter;
     }
-  } catch (err) {
-    log("[todo-sync] Failed to resolve Todo.update", { error: String(err) });
+  } catch {
+    // SDK writer unavailable — expected in most environments
   }
-  return null;
+
+  return createFileBasedWriter();
+}
+
+function createFileBasedWriter(): TodoWriter {
+  return async ({ sessionID, todos }) => {
+    const mapped: OpenCodeTodo[] = todos.map((t) => ({
+      content: t.content,
+      status: t.status,
+      priority: t.priority ?? "medium",
+      id: t.id ?? "",
+    }));
+    saveOpenCodeTodos(sessionID, mapped);
+    log("[todo-sync] Wrote todos via file-based fallback", { sessionID, count: mapped.length });
+  };
 }
 
 function extractTodos(response: unknown): TodoInfo[] {

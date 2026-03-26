@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { isSubagentSession } from "../../shared/task-ownership-policy"
 
 const TASK_TOOLS = new Set([
   "task",
@@ -28,6 +29,9 @@ export function createTaskReminderHook(_ctx: PluginInput) {
 
   const toolExecuteAfter = async (input: ToolExecuteInput, output: ToolExecuteOutput) => {
     const { tool, sessionID } = input
+
+    if (isSubagentSession(sessionID)) return
+
     const toolLower = tool.toLowerCase()
 
     if (TASK_TOOLS.has(toolLower)) {

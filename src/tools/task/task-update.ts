@@ -10,6 +10,7 @@ import {
   acquireLock,
 } from "../../features/claude-tasks/storage";
 import { syncTaskTodoUpdate } from "./todo-sync";
+import { canCreatePersistentTask } from "../../shared/task-ownership-policy";
 
 const TASK_ID_PATTERN = /^T-[A-Za-z0-9-]+$/;
 
@@ -75,6 +76,10 @@ async function handleUpdate(
   context: { sessionID: string },
 ): Promise<string> {
   try {
+    if (!canCreatePersistentTask(context.sessionID)) {
+      return JSON.stringify({ error: "subagent_denied", message: "Subagent sessions cannot modify persistent tasks" });
+    }
+
     const validatedArgs = TaskUpdateInputSchema.parse(args);
     const taskId = parseTaskId(validatedArgs.id);
     if (!taskId) {
