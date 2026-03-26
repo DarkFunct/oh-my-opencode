@@ -39,18 +39,18 @@ function extractCaptureInput(responseText: string, metadata: Record<string, unkn
 }
 
 function extractChangedFiles(text: string): RawCaptureInput["changedFiles"] {
-  const filePatterns = text.match(/(?:created?|modified?|edited|wrote|updated|deleted|renamed)\s+[`"]?([^\s`"]+\.[a-zA-Z]{1,6})[`"]?/gi)
+  const filePatterns = text.match(/(?:created?|modified?|edited|wrote|updated|deleted|renamed|moved)\s+(?:\d+\s+bytes\s+to\s+)?(?:file\s+)?[`"]?([^\s`"]+\.[a-zA-Z0-9]{1,10})[`"]?/gi)
   if (!filePatterns) return []
 
   const seen = new Set<string>()
   const files: RawCaptureInput["changedFiles"] = []
 
   for (const match of filePatterns) {
-    const pathMatch = match.match(/[`"]?([^\s`"]+\.[a-zA-Z]{1,6})[`"]?$/)
+    const pathMatch = match.match(/[`"]?([^\s`"]+\.[a-zA-Z0-9]{1,10})[`"]?$/)
     if (!pathMatch?.[1] || seen.has(pathMatch[1])) continue
     seen.add(pathMatch[1])
 
-    const changeType = match.match(/^(created?|modified?|edited|wrote|updated|deleted|renamed)/i)?.[1]?.toLowerCase() ?? "modify"
+    const changeType = match.match(/^(created?|modified?|edited|wrote|updated|deleted|renamed|moved)/i)?.[1]?.toLowerCase() ?? "modify"
     const mapped = changeType.startsWith("creat") ? "create" as const
       : changeType.startsWith("delet") ? "delete" as const
       : changeType.startsWith("renam") ? "rename" as const

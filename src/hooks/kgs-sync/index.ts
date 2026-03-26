@@ -48,15 +48,27 @@ function resolveSyncFactory(): KGSSyncFactory {
   return candidate as KGSSyncFactory
 }
 
-function extractFilePath(
-  _input: { tool: string },
+function extractFilePathFromArgs(args: Record<string, unknown>): string | null {
+  const candidate = args.filePath ?? args.file_path ?? args.path ?? args.file
+  return typeof candidate === "string" && candidate.length > 0 ? candidate : null
+}
+
+function extractFilePathFromOutput(
+  pendingPath: string | null,
   output: { output: string; metadata: Record<string, unknown> },
 ): string | null {
+  if (pendingPath) return pendingPath
+
   const metaPath = output.metadata?.filePath ?? output.metadata?.file_path ?? output.metadata?.path
   if (typeof metaPath === "string" && metaPath.length > 0) return metaPath
 
-  const match = output.output?.match(/(?:wrote|edited|created|modified)\s+(?:file\s+)?[`"]?([^\s`"\n]+\.[a-zA-Z]{1,10})[`"]?/i)
-  return match?.[1] ?? null
+  const text = output.output ?? ""
+
+  const verbMatch = text.match(/(?:updated|wrote|edited|created|modified|moved|deleted)\s+(?:\d+\s+bytes\s+to\s+)?(?:file\s+)?[`"]?([^\s`"\n]+\.[a-zA-Z0-9]{1,10})[`"]?/i)
+  if (verbMatch?.[1]) return verbMatch[1]
+
+  const absMatch = text.match(/(\/[^\s`"\n]+\.[a-zA-Z0-9]{1,10})/m)
+  return absMatch?.[1] ?? null
 }
 
 function inferChangeType(tool: string): "create" | "modify" {
@@ -66,6 +78,7 @@ function inferChangeType(tool: string): "create" | "modify" {
 
 export function createKGSSyncHook(_ctx: PluginInput) {
   let adapter: KGSSyncAdapter | null = null
+  const pendingFilePaths = new Map<string, string>()
 
   function getAdapter(): KGSSyncAdapter {
     if (!adapter) {
@@ -99,13 +112,27 @@ export function createKGSSyncHook(_ctx: PluginInput) {
   }
 
   return {
+    "tool.execute.before": (
+      input: { tool: string; callID?: string },
+      output: { args: Record<string, unknown> },
+    ) => {
+      if (!FILE_WRITE_TOOLS.has(input.tool) || !input.callID) return
+      const filePath = extractFilePathFromArgs(output.args)
+      if (filePath) {
+        pendingFilePaths.set(input.callID, filePath)
+      }
+    },
+
     "tool.execute.after": async (
       input: { tool: string; sessionID: string; callID: string },
       output: { title: string; output: string; metadata: Record<string, unknown> },
     ) => {
       if (!FILE_WRITE_TOOLS.has(input.tool)) return
 
-      const filePath = extractFilePath(input, output)
+      const pending = input.callID ? pendingFilePaths.get(input.callID) ?? null : null
+      if (input.callID) pendingFilePaths.delete(input.callID)
+
+      const filePath = extractFilePathFromOutput(pending, output)
       if (!filePath) {
         log(`${KGS_SYNC_LOG_PREFIX} No file path extracted`, { tool: input.tool })
         return

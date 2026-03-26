@@ -71,6 +71,8 @@ export function createToolExecuteBeforeHandler(args: {
     }
     try { await hooks.sessionEvidenceCollector?.["tool.execute.before"]?.(input, output) }
     catch (e) { log("[gaia-hook-error] sessionEvidenceCollector before failed", { tool: input.tool, sessionID: input.sessionID, error: e }) }
+    try { hooks.kgsSync?.["tool.execute.before"]?.(input, output) }
+    catch (e) { log("[gaia-hook-error] kgsSync before failed", { tool: input.tool, sessionID: input.sessionID, error: e }) }
     try { await hooks.fixLifecycleGate?.["tool.execute.before"]?.(input, output) }
     catch (e) {
       if (e instanceof Error && e.message.startsWith("[")) throw e
