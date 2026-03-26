@@ -71,6 +71,10 @@ function isErrorLikelyResolved(
 		return true
 	}
 
+	// Stale error: if >15 rounds old without re-detection, auto-resolve
+	const roundAge = state.roundCounter - (error.round ?? 0)
+	if (roundAge > 15) return true
+
 	if (error.filePath) {
 		const editEntry = state.fileEditHistory.get(error.filePath)
 		return !!editEntry && editEntry.lastEditTimestamp >= error.timestamp

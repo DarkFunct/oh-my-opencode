@@ -33,9 +33,14 @@ export function fuseConfidence(
 	}
 
 	if (structural.exitCode !== undefined) {
+		if (structural.exitCode === 0) {
+			return { classification: "info", confidence: 0.8, source, evidence: [`exitCode=0`] }
+		}
+		// Exit code alone without corroborating text patterns is ambiguous —
+		// common false positives: grep(1), diff(1), test(1), find(1)
 		return {
-			classification: structural.exitCode !== 0 ? "error" : "info",
-			confidence: 0.8,
+			classification: "ambiguous",
+			confidence: 0.6,
 			source,
 			evidence: [`exitCode=${structural.exitCode}`],
 		}
