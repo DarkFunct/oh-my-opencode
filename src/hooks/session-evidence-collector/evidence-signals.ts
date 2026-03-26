@@ -12,6 +12,22 @@ const EXECUTE_TOOLS = new Set([
 	"edit", "write", "bash", "interactive_bash", "ast_grep_replace", "lsp_rename",
 ])
 
+/**
+ * File extensions that have no LSP server, so lsp_diagnostics cannot reset
+ * the editsSinceLastVerification counter for them. Edits to these files
+ * should NOT increment the counter (prevents perpetual F3 false positives).
+ */
+const NON_VERIFIABLE_EXTENSIONS = new Set([
+	".md", ".mdx", ".txt", ".yaml", ".yml", ".json", ".toml",
+])
+
+export function isVerifiableFile(filePath: string): boolean {
+	const lower = filePath.toLowerCase()
+	return !NON_VERIFIABLE_EXTENSIONS.has(
+		lower.slice(lower.lastIndexOf(".")),
+	)
+}
+
 const KNOWLEDGE_FILE_PATTERNS = [
 	/_meta\/knowledge\//,
 	/lessons-learned/,

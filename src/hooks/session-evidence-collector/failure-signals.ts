@@ -55,6 +55,10 @@ export function hasReadKnowledgeFiles(state: SessionCognitiveState): boolean {
 	return false
 }
 
+export function isKnowledgeFile(filePath: string): boolean {
+	return KNOWLEDGE_PATH_PATTERNS.some((p) => p.test(filePath))
+}
+
 export function isSameDirectionRetry(state: SessionCognitiveState): boolean {
 	return (
 		state.consecutiveFixFailures >= 2 &&

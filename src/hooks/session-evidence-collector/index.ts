@@ -8,7 +8,7 @@ import { fuseConfidence } from "./confidence-fusion"
 import { detectResetTriggers } from "./reset-triggers"
 import { executeResets } from "./reset-executor"
 import { trackFileEdit, trackReadFile, trackBuildResult, trackTestResult } from "./edit-tracker"
-import { isReadTool, isGrepTool, isExecuteTool, isCaptureTarget, detectMethodologyDimension } from "./evidence-signals"
+import { isReadTool, isGrepTool, isExecuteTool, isCaptureTarget, detectMethodologyDimension, isVerifiableFile } from "./evidence-signals"
 import { scoreAllEvidences } from "../context-relevance-scorer"
 import { log } from "../../shared"
 
@@ -42,7 +42,9 @@ export function createSessionEvidenceCollectorHook(_ctx: PluginInput) {
 			}
 
 			if (WRITE_TOOLS.has(normalized)) {
-				state.editsSinceLastVerification++
+				if (!filePath || isVerifiableFile(filePath)) {
+					state.editsSinceLastVerification++
+				}
 			}
 
 			if (isGrepTool(normalized)) {

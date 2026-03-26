@@ -62,3 +62,14 @@ export function isSourceRegistered(toolName: string): boolean {
 	const normalized = toolName.toLowerCase().replace(/-/g, "_")
 	return normalized in SOURCE_CLASSIFICATION || toolName.toLowerCase() in SOURCE_CLASSIFICATION
 }
+
+const BUILD_COMMAND_PATTERN =
+	/\b(tsc|typecheck|build|compile|webpack|vite\s+build|rollup|esbuild|swc|turbopack)\b/i
+const TEST_COMMAND_PATTERN =
+	/\b(vitest|jest|mocha|bun\s+test|npm\s+test|pnpm\s+test|yarn\s+test|pytest|go\s+test)\b/i
+
+export function refineBashSource(command: string): SourceType {
+	if (BUILD_COMMAND_PATTERN.test(command)) return "build_output"
+	if (TEST_COMMAND_PATTERN.test(command)) return "test_output"
+	return "shell_command"
+}

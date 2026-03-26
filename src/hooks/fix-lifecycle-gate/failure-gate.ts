@@ -1,7 +1,8 @@
 import type { SessionCognitiveState, CognitiveFailure } from "../cognitive-governance-shared/types"
-import { computeErrorTraceDepth, isSameDirectionRetry } from "../session-evidence-collector/failure-signals"
+import { computeErrorTraceDepth, computeFixTargetConsistency, isSameDirectionRetry } from "../session-evidence-collector/failure-signals"
 
 const F3_BLOCK_THRESHOLD = 5
+const F2_F4_BLOCK_THRESHOLD = 3
 
 export function detectCognitiveFailureBlock(
 	state: SessionCognitiveState,
@@ -44,6 +45,36 @@ export function detectCognitiveFailureBlock(
 		}
 	}
 
+	// F2: Fix Direction Mismatch — repeated failures with zero overlap between error source and edit targets
+	if (state.consecutiveFixFailures >= F2_F4_BLOCK_THRESHOLD) {
+		const consistency = computeFixTargetConsistency(state)
+		if (consistency === 0 && state.detectedErrors.length > 0 && state.fileEditHistory.size > 0) {
+			const errorFiles = state.detectedErrors
+				.map((e) => e.filePath)
+				.filter((f): f is string => !!f)
+			return {
+				id: "F2",
+				name: "Fix Direction Mismatch",
+				action: "block",
+				directive: buildF2BlockDirective([...new Set(errorFiles)]),
+			}
+		}
+	}
+
+	// F4: Knowledge Blindspot — repeated failures without consulting knowledge base
+	if (
+		state.consecutiveFixFailures >= F2_F4_BLOCK_THRESHOLD &&
+		!state.knowledgeReadSinceLastFailure &&
+		state.newFilesReadSinceLastFailure === 0
+	) {
+		return {
+			id: "F4",
+			name: "Knowledge Blindspot",
+			action: "block",
+			directive: buildF4BlockDirective(state.consecutiveFixFailures),
+		}
+	}
+
 	return null
 }
 
@@ -67,5 +98,20 @@ function buildF3Directive(editCount: number): string {
 	return (
 		`[🛑 F3: 改而不验] 已连续编辑 ${editCount} 个文件未运行验证。` +
 		`请先执行 lsp_diagnostics 或 typecheck 确认无回归，再继续编辑。`
+	)
+}
+
+function buildF2BlockDirective(errorSourceFiles: string[]): string {
+	const fileList = errorSourceFiles.slice(0, 5).join(", ")
+	return (
+		`[🛑 F2: 修复方向偏离] 连续 ${F2_F4_BLOCK_THRESHOLD} 次失败且编辑目标与错误源零重叠。` +
+		`错误涉及: ${fileList}。请 read 错误源文件重新定位根因。`
+	)
+}
+
+function buildF4BlockDirective(failureCount: number): string {
+	return (
+		`[🛑 F4: 经验盲区] 连续 ${failureCount} 次修复失败且未查阅知识库。` +
+		`请 read _meta/knowledge/pitfalls.md 和 lessons-learned.md 检查已知解决方案。`
 	)
 }

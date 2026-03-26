@@ -26,6 +26,7 @@ function createDefaultState(): SessionCognitiveState {
 		citationMap: new Map(),
 		editsSinceLastVerification: 0,
 		newFilesReadSinceLastFailure: 0,
+		knowledgeReadSinceLastFailure: false,
 		cognitiveEvidence: [],
 		currentLayer: "perception",
 		dimensionsCovered: new Set(),

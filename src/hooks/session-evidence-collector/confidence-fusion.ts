@@ -21,6 +21,34 @@ export function fuseConfidence(
 		}
 	}
 
+	// II-1: file_modification structural signal — editSuccess is deterministic
+	if (source === "file_modification" && structural.editSuccess !== undefined) {
+		if (!structural.editSuccess) {
+			return {
+				classification: "error",
+				confidence: 0.95,
+				source,
+				evidence: [`editSuccess=false`, ...textMatches.map((m) => m.pattern)],
+			}
+		}
+		return { classification: "info", confidence: 0.9, source, evidence: [`editSuccess=true`] }
+	}
+
+	// II-1: agent_output structural signal — taskStatus from task/background_output
+	if (source === "agent_output" && structural.taskStatus !== undefined) {
+		if (structural.taskStatus === "error") {
+			return {
+				classification: "error",
+				confidence: 0.9,
+				source,
+				evidence: [`taskStatus=error`, ...textMatches.map((m) => m.pattern)],
+			}
+		}
+		if (structural.taskStatus === "completed") {
+			return { classification: "info", confidence: 0.9, source, evidence: [`taskStatus=completed`] }
+		}
+	}
+
 	if (structural.exitCode !== undefined && textMatches.length > 0) {
 		const isError = structural.exitCode !== 0
 		const textClassification = highestSeverity(textMatches)

@@ -33,6 +33,8 @@ const RESETTABLE_BY_SCOPE: Record<ResetScope, (state: SessionCognitiveState) => 
 		keys.push("fixAttempts")
 		state.lastFixTarget = null
 		keys.push("lastFixTarget")
+		state.knowledgeReadSinceLastFailure = false
+		keys.push("knowledgeReadSinceLastFailure")
 		return keys
 	},
 

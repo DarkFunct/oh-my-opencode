@@ -212,6 +212,7 @@ export interface SessionCognitiveState {
 	// L1: Cognitive failure detection counters
 	editsSinceLastVerification: number
 	newFilesReadSinceLastFailure: number
+	knowledgeReadSinceLastFailure: boolean
 
 	// L3: Cognitive assessment
 	cognitiveEvidence: CognitiveEvidence[]
