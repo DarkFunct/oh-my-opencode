@@ -15,27 +15,18 @@ export function buildNoTaskCreatedReminder(state: TaskLifecycleSessionState): st
 }
 
 export function buildChatMessageTaskStatus(state: TaskLifecycleSessionState): string {
-	if (!state.hasCreatedTask && state.editWriteCallCount === 0) {
+	const hasEditsWithoutTask = state.editWriteCallCount > 0 && !state.hasCreatedTask
+
+	if (!hasEditsWithoutTask) {
 		return ""
 	}
 
-	const activeIds = Array.from(state.activeTaskIds)
-	const lines = [
+	return [
 		`\n<task-lifecycle-status>`,
-	]
-
-	if (activeIds.length > 0) {
-		lines.push(`活跃任务: ${activeIds.join(", ")}`)
-		lines.push(`已完成: ${state.taskCompletedCount}`)
-	} else if (state.editWriteCallCount > 0 && !state.hasCreatedTask) {
-		lines.push(`⚠️ 已执行 ${state.editWriteCallCount} 次修改操作但未创建任何 Task`)
-		lines.push("多步骤工作必须先 task_create 创建任务")
-	} else if (state.hasCreatedTask && activeIds.length === 0) {
-		lines.push(`所有任务已完成 (共 ${state.taskCompletedCount})`)
-	}
-
-	lines.push("</task-lifecycle-status>")
-	return lines.join("\n")
+		`⚠️ 已执行 ${state.editWriteCallCount} 次修改操作但未创建任何 Task`,
+		"多步骤工作必须先 task_create 创建任务",
+		"</task-lifecycle-status>",
+	].join("\n")
 }
 
 export function buildCompactionCheckpoint(state: TaskLifecycleSessionState): string {

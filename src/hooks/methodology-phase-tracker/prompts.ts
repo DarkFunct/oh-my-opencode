@@ -1,4 +1,4 @@
-import type { MethodologyPhase, MethodologySessionState } from "./types"
+import type { MethodologySessionState } from "./types"
 
 export function buildSkippedReadReminder(state: MethodologySessionState): string {
 	return [
@@ -38,11 +38,10 @@ export function buildTaskCompletionNoCaptureWarning(): string {
 }
 
 export function buildChatMessagePhaseStatus(state: MethodologySessionState): string {
-	const completedList = Array.from(state.completedPhases)
-	const allPhases: MethodologyPhase[] = ["read", "plan", "execute", "capture"]
-	const missing = allPhases.filter(p => !completedList.includes(p))
+	const hasSkippedRead = state.readCallCount === 0 && state.executeCallCount > 0
+	const needsCapture = state.executeCallCount > 0 && !state.completedPhases.has("capture")
 
-	if (state.toolCallCount === 0 && completedList.length === 0) {
+	if (!hasSkippedRead && !needsCapture) {
 		return ""
 	}
 
@@ -50,15 +49,11 @@ export function buildChatMessagePhaseStatus(state: MethodologySessionState): str
 		`\n<methodology-status phase="${state.currentPhase}" read="${state.readCallCount}" execute="${state.executeCallCount}">`,
 	]
 
-	if (missing.length > 0 && missing.length < 4) {
-		lines.push(`未完成阶段: ${missing.join(", ")}`)
-	}
-
-	if (state.readCallCount === 0 && state.executeCallCount > 0) {
+	if (hasSkippedRead) {
 		lines.push("⚠️ 尚未执行 Read 阶段，请先阅读相关文件再继续修改")
 	}
 
-	if (state.executeCallCount > 0 && !completedList.includes("capture")) {
+	if (needsCapture) {
 		lines.push("📝 Execute 已进行，记得完成 Capture 阶段（知识沉淀）")
 	}
 
