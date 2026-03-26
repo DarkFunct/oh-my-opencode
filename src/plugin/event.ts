@@ -226,6 +226,7 @@ export function createEventHandler(args: {
     await Promise.resolve(hooks.fixLifecycleGate?.event?.(input));
     await Promise.resolve(hooks.cognitiveGovernance?.event?.(input));
     await Promise.resolve(hooks.behavioralGovernance?.event?.(input));
+    await Promise.resolve(hooks.kgsSync?.event?.(input));
   };
 
   const recentSyntheticIdles = new Map<string, number>();

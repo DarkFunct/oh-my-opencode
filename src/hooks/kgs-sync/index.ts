@@ -29,6 +29,7 @@ type KGSSyncAdapter = {
     oldPath?: string,
   ): void
   flush(): Promise<void>
+  flushAndDispose(): Promise<void>
   dispose(): void
 }
 
@@ -117,6 +118,21 @@ export function createKGSSyncHook(_ctx: PluginInput) {
         syncAdapter.onFileChange(filePath, changeType, projectRoot)
       } catch (error) {
         log(`${KGS_SYNC_LOG_PREFIX} Unexpected error`, { error })
+      }
+    },
+
+    event: async (input: { event: { type: string; properties?: Record<string, unknown> } }) => {
+      if (input.event.type !== "session.deleted") return
+      if (!adapter) return
+
+      try {
+        log(`${KGS_SYNC_LOG_PREFIX} Session deleted — flushing pending writes`)
+        await adapter.flushAndDispose()
+        adapter = null
+      } catch (error) {
+        log(`${KGS_SYNC_LOG_PREFIX} Flush on session delete failed`, { error })
+        try { adapter?.dispose(); } catch { /* best-effort cleanup */ }
+        adapter = null
       }
     },
   }
