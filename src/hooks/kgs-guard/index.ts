@@ -2,6 +2,7 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import { createKGSGuard, type RawCaptureInput } from "@gaia/omo-hooks"
 import { getKGSService } from "../../features/kgs"
 import { log } from "../../shared"
+import { extractDesignDecisions, extractPitfalls, extractPatterns, extractConstraints } from "./semantic-extractor"
 
 const KGS_GUARD_LOG_PREFIX = "[kgs-guard]"
 
@@ -30,6 +31,10 @@ function extractCaptureInput(responseText: string, metadata: Record<string, unkn
     planEvidence: extractEvidence(responseText, "Plan"),
     executeEvidence: extractEvidence(responseText, "Execute"),
     captureEvidence: extractEvidence(responseText, "Capture"),
+    designDecisions: extractDesignDecisions(responseText),
+    pitfalls: extractPitfalls(responseText),
+    patterns: extractPatterns(responseText),
+    constraints: extractConstraints(responseText),
   }
 }
 
