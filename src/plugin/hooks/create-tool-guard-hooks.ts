@@ -28,6 +28,7 @@ import {
   createSessionEvidenceCollectorHook,
   createFixLifecycleGateHook,
   createKnowledgeProtectionHook,
+  createToolAbortRecoveryHook,
 } from "../../hooks"
 import {
   getOpenCodeVersion,
@@ -63,6 +64,7 @@ export type ToolGuardHooks = {
   sessionEvidenceCollector: ReturnType<typeof createSessionEvidenceCollectorHook> | null
   fixLifecycleGate: ReturnType<typeof createFixLifecycleGateHook> | null
   knowledgeProtection: ReturnType<typeof createKnowledgeProtectionHook> | null
+  toolAbortRecovery: ReturnType<typeof createToolAbortRecoveryHook> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -195,6 +197,10 @@ export function createToolGuardHooks(args: {
     ? safeHook("knowledge-protection", () => createKnowledgeProtectionHook(ctx))
     : null
 
+  const toolAbortRecovery = isHookEnabled("tool-abort-recovery")
+    ? safeHook("tool-abort-recovery", () => createToolAbortRecoveryHook(ctx))
+    : null
+
   return {
     commentChecker,
     toolOutputTruncator,
@@ -221,5 +227,6 @@ export function createToolGuardHooks(args: {
     fixLifecycleGate,
     kgsSync,
     knowledgeProtection,
+    toolAbortRecovery,
   }
 }
