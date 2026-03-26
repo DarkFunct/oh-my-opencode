@@ -1,4 +1,5 @@
 export { getCognitiveState, deleteCognitiveSession, hasCognitiveSession } from "./state"
+export { isCaptureSettled, recordCaptureWrite } from "./capture-cooldown"
 export type {
 	SessionCognitiveState,
 	CognitiveLayer,

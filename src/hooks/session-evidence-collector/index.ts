@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { getCognitiveState, deleteCognitiveSession } from "../cognitive-governance-shared/state"
+import { recordCaptureWrite } from "../cognitive-governance-shared/capture-cooldown"
 import { classifySource } from "./source-classifier"
 import { extractFilePath, extractStructuralSignals } from "./structural-signals"
 import { matchTextSignals, isFixAttempt } from "./text-matcher"
@@ -77,8 +78,7 @@ export function createSessionEvidenceCollectorHook(_ctx: PluginInput) {
 				trackFileEdit(state, filePath, normalized)
 				state.executePhaseActive = true
 				if (isCaptureTarget(filePath)) {
-					state.captureCompleted = true
-					state.captureSignals.push(filePath)
+					recordCaptureWrite(state, filePath)
 				}
 			}
 

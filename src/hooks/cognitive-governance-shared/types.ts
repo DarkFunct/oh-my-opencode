@@ -185,9 +185,10 @@ export interface SessionCognitiveState {
 	grepCount: number
 	toolSequence: ToolCall[]
 
-	// L1: Capture tracking
+	// L1: Capture tracking (P-016 cooldown mechanism)
 	executePhaseActive: boolean
-	captureCompleted: boolean
+	captureLastWriteRound: number
+	captureWriteCount: number
 	captureSignals: string[]
 
 	// L1.5: Context relevance scoring

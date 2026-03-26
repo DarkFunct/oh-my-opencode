@@ -9,7 +9,8 @@ import { log } from "../../shared"
 const PRESERVED_KEYS: readonly string[] = [
 	"currentLayer",
 	"dimensionsCovered",
-	"captureCompleted",
+	"captureLastWriteRound",
+	"captureWriteCount",
 	"captureSignals",
 	"cognitiveEvidence",
 	"readFiles",

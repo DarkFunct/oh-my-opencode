@@ -1,4 +1,5 @@
 import type { SessionCognitiveState } from "../cognitive-governance-shared/types"
+import { isCaptureSettled } from "../cognitive-governance-shared/capture-cooldown"
 
 const CAPTURE_HARD_BLOCK_THRESHOLD = 4
 const EXECUTE_ACTIVITY_THRESHOLD = 3
@@ -11,7 +12,7 @@ export interface CaptureVerdict {
 }
 
 export function detectCaptureViolation(state: SessionCognitiveState): CaptureVerdict {
-	if (!state.executePhaseActive || state.captureCompleted) {
+	if (!state.executePhaseActive || isCaptureSettled(state)) {
 		return { shouldBlock: false, reason: "ok", roundsPending: 0, editedFiles: 0 }
 	}
 

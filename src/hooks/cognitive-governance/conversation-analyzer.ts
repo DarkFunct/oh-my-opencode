@@ -1,4 +1,5 @@
 import type { SessionCognitiveState, CognitiveLayer, MethodologyDimension, DetectedError } from "../cognitive-governance-shared/types"
+import { isCaptureSettled } from "../cognitive-governance-shared/capture-cooldown"
 
 export interface CognitiveAssessment {
 	currentLayer: CognitiveLayer
@@ -27,7 +28,7 @@ export function assessCognition(state: SessionCognitiveState): CognitiveAssessme
 		state.lastBuildResult === "success" ||
 		state.lastTestResult === "success"
 
-	const captureNeeded = state.executePhaseActive && !state.captureCompleted && state.fileEditHistory.size >= 3
+	const captureNeeded = state.executePhaseActive && !isCaptureSettled(state) && state.fileEditHistory.size >= 3
 	const captureUrgency = deriveCaptureUrgency(state, captureNeeded)
 
 	return {
