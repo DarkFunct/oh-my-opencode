@@ -1,9 +1,12 @@
 import type { SessionCognitiveState, CognitiveFailure } from "../cognitive-governance-shared/types"
 import { computeErrorTraceDepth, isSameDirectionRetry } from "../session-evidence-collector/failure-signals"
 
+const F3_BLOCK_THRESHOLD = 5
+
 export function detectCognitiveFailureBlock(
 	state: SessionCognitiveState,
 ): CognitiveFailure | null {
+	// F1: Blind Execution — errors detected but source files not read
 	if (state.detectedErrors.length > 0 && state.executePhaseActive) {
 		const traceDepth = computeErrorTraceDepth(state)
 		if (traceDepth === 0) {
@@ -20,6 +23,18 @@ export function detectCognitiveFailureBlock(
 		}
 	}
 
+	// F3: Unverified Changes — too many edits without running verification
+	// Progressive: warn at ≥4 (L3 failure-directives.ts), block at ≥5 (here)
+	if (state.editsSinceLastVerification >= F3_BLOCK_THRESHOLD) {
+		return {
+			id: "F3",
+			name: "Unverified Changes",
+			action: "block",
+			directive: buildF3Directive(state.editsSinceLastVerification),
+		}
+	}
+
+	// F5: Same Direction Retry — consecutive failures with no new investigation
 	if (isSameDirectionRetry(state)) {
 		return {
 			id: "F5",
@@ -45,5 +60,12 @@ function buildF5Directive(failureCount: number): string {
 	return (
 		`[🛑 F5: 同向重试] 连续 ${failureCount} 次修复失败，且未读取新文件。` +
 		`当前修复方向可能错误。请读取新文件重新取证，改变调查方向。`
+	)
+}
+
+function buildF3Directive(editCount: number): string {
+	return (
+		`[🛑 F3: 改而不验] 已连续编辑 ${editCount} 个文件未运行验证。` +
+		`请先执行 lsp_diagnostics 或 typecheck 确认无回归，再继续编辑。`
 	)
 }

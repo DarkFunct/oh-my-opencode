@@ -5,6 +5,7 @@ import { assessCognition, determineCognitiveLayer } from "../cognitive-governanc
 import { detectRepeatFix, incrementConsecutiveFailure } from "./repeat-fix-detector"
 import { detectCaptureViolation } from "./capture-gate"
 import { detectCognitiveFailureBlock } from "./failure-gate"
+import { detectCognitiveFailureWarn } from "../cognitive-governance/failure-directives"
 
 describe("cognitive-governance-shared/state", () => {
 	test("creates default state on first access", () => {
@@ -169,7 +170,7 @@ describe("capture-gate", () => {
 	})
 })
 
-describe("failure-gate (F1/F5)", () => {
+describe("failure-gate (F1/F3/F5)", () => {
 	test("F1: blocks blind execution — errors detected but source not read", () => {
 		const state = getCognitiveState("test-f1-1")
 		state.executePhaseActive = true
@@ -203,6 +204,37 @@ describe("failure-gate (F1/F5)", () => {
 		deleteCognitiveSession("test-f1-2")
 	})
 
+	test("F3: no block when edits below threshold", () => {
+		const state = getCognitiveState("test-f3-1")
+		state.editsSinceLastVerification = 4
+		const failure = detectCognitiveFailureBlock(state)
+		expect(failure).toBeNull()
+		deleteCognitiveSession("test-f3-1")
+	})
+
+	test("F3: blocks at 5+ edits without verification", () => {
+		const state = getCognitiveState("test-f3-2")
+		state.editsSinceLastVerification = 5
+		const failure = detectCognitiveFailureBlock(state)
+		expect(failure).not.toBeNull()
+		expect(failure!.id).toBe("F3")
+		expect(failure!.name).toBe("Unverified Changes")
+		expect(failure!.action).toBe("block")
+		expect(failure!.directive).toContain("F3")
+		expect(failure!.directive).toContain("5")
+		deleteCognitiveSession("test-f3-2")
+	})
+
+	test("F3: blocks at higher edit counts", () => {
+		const state = getCognitiveState("test-f3-3")
+		state.editsSinceLastVerification = 10
+		const failure = detectCognitiveFailureBlock(state)
+		expect(failure).not.toBeNull()
+		expect(failure!.id).toBe("F3")
+		expect(failure!.directive).toContain("10")
+		deleteCognitiveSession("test-f3-3")
+	})
+
 	test("F5: blocks same direction retry — 2+ failures with no new reads", () => {
 		const state = getCognitiveState("test-f5-1")
 		state.consecutiveFixFailures = 2
@@ -221,6 +253,34 @@ describe("failure-gate (F1/F5)", () => {
 		const failure = detectCognitiveFailureBlock(state)
 		expect(failure).toBeNull()
 		deleteCognitiveSession("test-f5-2")
+	})
+
+	test("F1 takes priority over F3", () => {
+		const state = getCognitiveState("test-priority-1")
+		state.executePhaseActive = true
+		state.detectedErrors.push({
+			pattern: "compilation",
+			rawMessage: "error TS2345",
+			tool: "bash",
+			timestamp: Date.now(),
+			filePath: "/src/broken.ts",
+		})
+		state.editsSinceLastVerification = 10
+		const failure = detectCognitiveFailureBlock(state)
+		expect(failure).not.toBeNull()
+		expect(failure!.id).toBe("F1")
+		deleteCognitiveSession("test-priority-1")
+	})
+
+	test("F3 takes priority over F5", () => {
+		const state = getCognitiveState("test-priority-2")
+		state.editsSinceLastVerification = 7
+		state.consecutiveFixFailures = 3
+		state.newFilesReadSinceLastFailure = 0
+		const failure = detectCognitiveFailureBlock(state)
+		expect(failure).not.toBeNull()
+		expect(failure!.id).toBe("F3")
+		deleteCognitiveSession("test-priority-2")
 	})
 })
 
@@ -320,5 +380,103 @@ describe("assessCognition", () => {
 		expect(a.captureNeeded).toBe(false)
 		expect(a.captureUrgency).toBe("none")
 		deleteCognitiveSession("test-assess-3")
+	})
+})
+
+describe("failure-directives (F2/F3-warn/F4)", () => {
+	test("F2: warns when editing files unrelated to error source", () => {
+		const state = getCognitiveState("test-f2-warn-1")
+		state.detectedErrors.push({
+			pattern: "compilation",
+			rawMessage: "error TS2345",
+			tool: "bash",
+			timestamp: Date.now(),
+			filePath: "/src/error-source.ts",
+		})
+		state.fileEditHistory.set("/src/unrelated.ts", { count: 1, lastEditTimestamp: Date.now(), tools: ["edit"] })
+		const warn = detectCognitiveFailureWarn(state)
+		expect(warn).not.toBeNull()
+		expect(warn).toContain("F2")
+		expect(warn).toContain("error-source.ts")
+		expect(warn).toContain("unrelated.ts")
+		deleteCognitiveSession("test-f2-warn-1")
+	})
+
+	test("no F2 when edited files overlap with error source", () => {
+		const state = getCognitiveState("test-f2-warn-2")
+		state.detectedErrors.push({
+			pattern: "compilation",
+			rawMessage: "error TS2345",
+			tool: "bash",
+			timestamp: Date.now(),
+			filePath: "/src/error-source.ts",
+		})
+		state.fileEditHistory.set("/src/error-source.ts", { count: 1, lastEditTimestamp: Date.now(), tools: ["edit"] })
+		const warn = detectCognitiveFailureWarn(state)
+		expect(warn).toBeNull()
+		deleteCognitiveSession("test-f2-warn-2")
+	})
+
+	test("F3 warn: triggers at 4+ edits without verification", () => {
+		const state = getCognitiveState("test-f3-warn-1")
+		state.editsSinceLastVerification = 4
+		const warn = detectCognitiveFailureWarn(state)
+		expect(warn).not.toBeNull()
+		expect(warn).toContain("F3")
+		expect(warn).toContain("4")
+		deleteCognitiveSession("test-f3-warn-1")
+	})
+
+	test("no F3 warn below threshold", () => {
+		const state = getCognitiveState("test-f3-warn-2")
+		state.editsSinceLastVerification = 3
+		const warn = detectCognitiveFailureWarn(state)
+		expect(warn).toBeNull()
+		deleteCognitiveSession("test-f3-warn-2")
+	})
+
+	test("F4: warns when in execute phase without reading knowledge files", () => {
+		const state = getCognitiveState("test-f4-warn-1")
+		state.executePhaseActive = true
+		const warn = detectCognitiveFailureWarn(state)
+		expect(warn).not.toBeNull()
+		expect(warn).toContain("F4")
+		expect(warn).toContain("知识库")
+		deleteCognitiveSession("test-f4-warn-1")
+	})
+
+	test("no F4 when knowledge files have been read", () => {
+		const state = getCognitiveState("test-f4-warn-2")
+		state.executePhaseActive = true
+		state.readFiles.add("_meta/knowledge/pitfalls.md")
+		const warn = detectCognitiveFailureWarn(state)
+		expect(warn).toBeNull()
+		deleteCognitiveSession("test-f4-warn-2")
+	})
+
+	test("no F4 when not in execute phase", () => {
+		const state = getCognitiveState("test-f4-warn-3")
+		state.executePhaseActive = false
+		const warn = detectCognitiveFailureWarn(state)
+		expect(warn).toBeNull()
+		deleteCognitiveSession("test-f4-warn-3")
+	})
+
+	test("F2 takes priority over F3 warn and F4", () => {
+		const state = getCognitiveState("test-warn-priority")
+		state.executePhaseActive = true
+		state.editsSinceLastVerification = 6
+		state.detectedErrors.push({
+			pattern: "compilation",
+			rawMessage: "error TS2345",
+			tool: "bash",
+			timestamp: Date.now(),
+			filePath: "/src/error-source.ts",
+		})
+		state.fileEditHistory.set("/src/unrelated.ts", { count: 1, lastEditTimestamp: Date.now(), tools: ["edit"] })
+		const warn = detectCognitiveFailureWarn(state)
+		expect(warn).not.toBeNull()
+		expect(warn).toContain("F2")
+		deleteCognitiveSession("test-warn-priority")
 	})
 })
