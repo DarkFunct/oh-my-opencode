@@ -15,7 +15,6 @@ function createDefaultState(): GovernanceSessionState {
 		bashCount: 0,
 		readCount: 0,
 		sourceCodeAuth: { level: "none" },
-		consecutiveFailures: 0,
 		bashSinceCheckpoint: 0,
 		attemptLog: [],
 		discoveredFacts: [],
@@ -65,19 +64,6 @@ export function incrementBashCount(sessionID: string): void {
 export function incrementReadCount(sessionID: string): void {
 	const state = getSessionState(sessionID)
 	state.readCount++
-}
-
-export function recordFailure(sessionID: string, context: string): void {
-	const state = getSessionState(sessionID)
-	state.consecutiveFailures++
-	state.lastFailureContext = context
-	state.attemptLog.push(`[FAIL #${state.consecutiveFailures}] ${context.slice(0, 200)}`)
-}
-
-export function resetFailures(sessionID: string): void {
-	const state = getSessionState(sessionID)
-	state.consecutiveFailures = 0
-	state.lastFailureContext = undefined
 }
 
 export function markCognitiveAnalysisComplete(sessionID: string): void {

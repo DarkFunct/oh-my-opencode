@@ -37,7 +37,6 @@ export function buildPreCompactCheckpoint(state: GovernanceSessionState): string
 		"",
 		"## Counters",
 		`Session bash count: ${state.bashCount} | Read count: ${state.readCount}`,
-		`Consecutive failures: ${state.consecutiveFailures}`,
 		`Cognitive analysis completed: ${state.cognitiveAnalysisCompleted}`,
 		"",
 		"## Attempt History",

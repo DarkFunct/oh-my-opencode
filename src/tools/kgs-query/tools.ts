@@ -5,9 +5,19 @@ import { createKGSQueryExecutor } from "@gaia/omo-hooks"
 import { getKGSService } from "../../features/kgs"
 import { log } from "../../shared"
 
-const VALID_QUERY_TYPES = new Set(["impact", "trace", "snapshot", "similar"])
+const VALID_QUERY_TYPES = new Set(["impact", "trace", "snapshot", "similar", "pattern", "context", "topology"])
 
-function parseQueryArgs(args: { query_type: string; entity: string; depth?: number; direction?: string; at?: string; compare_to?: string; scope?: string }): KGSQuery | null {
+function parseQueryArgs(args: {
+  query_type: string
+  entity: string
+  depth?: number
+  direction?: string
+  at?: string
+  compare_to?: string
+  scope?: string
+  min_confidence?: number
+  granularity?: string
+}): KGSQuery | null {
   const { query_type, entity } = args
   if (!VALID_QUERY_TYPES.has(query_type)) return null
 
@@ -38,6 +48,23 @@ function parseQueryArgs(args: { query_type: string; entity: string; depth?: numb
         reference: entity,
         scope: args.scope,
       }
+    case "pattern":
+      return {
+        type: "pattern",
+        scope: args.scope,
+        minConfidence: args.min_confidence ?? 0.6,
+      }
+    case "context":
+      return {
+        type: "context",
+        target: entity,
+      }
+    case "topology":
+      return {
+        type: "topology",
+        scope: args.scope,
+        granularity: (args.granularity as "module" | "package" | "directory") ?? "module",
+      }
     default:
       return null
   }
@@ -47,14 +74,16 @@ export function createKGSQueryTool(_ctx: PluginInput): Record<string, ToolDefini
   const kgs_query: ToolDefinition = tool({
     description:
       "Query the Knowledge Graph Service (KGS) to understand codebase structure, " +
-      "impact analysis, dependency tracing, temporal snapshots, and similar entity discovery. " +
+      "impact analysis, dependency tracing, temporal snapshots, similar entity discovery, " +
+      "pattern detection, context gathering, and topology analysis. " +
       "Use during Read/Plan phases to gather codebase intelligence before making changes.",
     args: {
       query_type: tool.schema
         .string()
         .describe(
           'Type of query: "impact" (change impact analysis), "trace" (dependency chain), ' +
-          '"snapshot" (point-in-time view), "similar" (find related entities)',
+          '"snapshot" (point-in-time view), "similar" (find related entities), ' +
+          '"pattern" (detect design patterns), "context" (entity context), "topology" (module topology)',
         ),
       entity: tool.schema
         .string()
@@ -78,13 +107,21 @@ export function createKGSQueryTool(_ctx: PluginInput): Record<string, ToolDefini
       scope: tool.schema
         .string()
         .optional()
-        .describe("Scope filter for similar queries (e.g., project or module path)"),
+        .describe("Scope filter for similar/pattern/topology queries (e.g., project or module path)"),
+      min_confidence: tool.schema
+        .number()
+        .optional()
+        .describe("Minimum confidence threshold for pattern queries (default: 0.6)"),
+      granularity: tool.schema
+        .string()
+        .optional()
+        .describe('Granularity for topology queries: "module", "package", or "directory" (default: "module")'),
     },
     execute: async (args) => {
       try {
         const query = parseQueryArgs(args)
         if (!query) {
-          return `Error: Invalid query_type "${args.query_type}". Must be one of: impact, trace, snapshot, similar`
+          return `Error: Invalid query_type "${args.query_type}". Must be one of: impact, trace, snapshot, similar, pattern, context, topology`
         }
 
         const service = getKGSService()

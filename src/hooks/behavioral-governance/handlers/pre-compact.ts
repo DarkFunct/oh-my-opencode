@@ -18,7 +18,6 @@ export function createPreCompactHandler() {
 				sessionID: input.sessionID,
 				bashCount: state.bashCount,
 				readCount: state.readCount,
-				failures: state.consecutiveFailures,
 				cognitiveComplete: state.cognitiveAnalysisCompleted,
 			})
 		} catch (e) {

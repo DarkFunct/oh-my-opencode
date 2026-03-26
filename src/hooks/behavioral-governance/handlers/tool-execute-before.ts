@@ -2,7 +2,6 @@ import type { GovernanceConfig } from "../types"
 import { getSessionState, incrementBashCount, incrementReadCount } from "../state"
 import { detectSourceCodeModification } from "../source-code-detector"
 import { buildCognitiveGatePrompt } from "../prompts/cognitive-gate"
-import { buildCircuitBreakerPrompt } from "../prompts/circuit-breaker"
 import { buildSourceAuthPrompt } from "../prompts/source-auth"
 import { buildExecutionRatioPrompt } from "../prompts/execution-ratio"
 import { log, isReadOnlyBashCommand, isVerificationBashCommand } from "../../../shared"
@@ -55,17 +54,6 @@ export function createToolExecuteBeforeHandler(config: GovernanceConfig) {
 						sourceCheck.operationType ?? "unknown",
 					))
 				}
-			}
-
-			if (state.consecutiveFailures >= config.failureThreshold) {
-				log("[behavioral-governance] Circuit breaker triggered", {
-					sessionID: input.sessionID,
-					failures: state.consecutiveFailures,
-				})
-				throw new Error(buildCircuitBreakerPrompt(
-					state.consecutiveFailures,
-					state.lastFailureContext,
-				))
 			}
 
 			if (toolLower === "bash") {

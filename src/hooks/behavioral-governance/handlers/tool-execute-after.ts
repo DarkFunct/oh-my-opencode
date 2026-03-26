@@ -1,8 +1,6 @@
 import type { GovernanceConfig } from "../types"
 import {
 	getSessionState,
-	recordFailure,
-	resetFailures,
 	markCognitiveAnalysisComplete,
 	resetCheckpointCounter,
 	grantSourceCodeAuth,
@@ -16,13 +14,6 @@ import {
 } from "../prompts/source-auth"
 import { log } from "../../../shared"
 
-const FAILURE_INDICATORS = [
-	/error:/i, /fatal:/i, /failed/i, /not found/i,
-	/permission denied/i, /cannot/i, /unable to/i,
-	/no such file/i, /command not found/i, /exit code [1-9]/i,
-	/refused/i, /timeout/i, /exception/i,
-]
-
 const COGNITIVE_MARKERS = [
 	/─── D1:.*Identity/i,
 	/─── D2:.*Composition/i,
@@ -32,10 +23,6 @@ const COGNITIVE_MARKERS = [
 ]
 
 const COGNITIVE_MARKERS_THRESHOLD = 3
-
-function detectBashFailure(output: string): boolean {
-	return FAILURE_INDICATORS.some((p) => p.test(output))
-}
 
 function detectCognitiveAnalysis(output: string): boolean {
 	const matches = COGNITIVE_MARKERS.filter((p) => p.test(output)).length
@@ -62,12 +49,6 @@ export function createToolExecuteAfterHandler(config: GovernanceConfig) {
 			const safeOutput = output.output ?? ""
 
 			if (toolLower === "bash") {
-				if (detectBashFailure(safeOutput)) {
-					recordFailure(input.sessionID, safeOutput.slice(0, 300))
-				} else {
-					resetFailures(input.sessionID)
-				}
-
 				if (state.bashSinceCheckpoint >= config.checkpointInterval) {
 					output.output = safeOutput + buildCheckpointReminderSuffix(state.bashSinceCheckpoint)
 					resetCheckpointCounter(input.sessionID)
