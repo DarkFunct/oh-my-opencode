@@ -170,10 +170,6 @@ export function createChatMessageHandler(args: {
     }
 		try { await hooks.behavioralGovernance?.["chat.message"]?.(input, output) }
 		catch (e) { log("[gaia-hook-error] behavioralGovernance chatMessage failed", { sessionID: input.sessionID, error: e }) }
-		try { await hooks.methodologyPhaseTracker?.["chat.message"]?.(input, output) }
-		catch (e) { log("[gaia-hook-error] methodologyPhaseTracker chatMessage failed", { sessionID: input.sessionID, error: e }) }
-		try { await hooks.taskLifecycleEnforcer?.["chat.message"]?.(input, output) }
-		catch (e) { log("[gaia-hook-error] taskLifecycleEnforcer chatMessage failed", { sessionID: input.sessionID, error: e }) }
 
     if (!hasConnectedProvidersCache()) {
       pluginContext.client.tui

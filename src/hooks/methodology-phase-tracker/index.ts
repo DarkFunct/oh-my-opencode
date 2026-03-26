@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { Message, Part } from "@opencode-ai/sdk"
 import type { PhaseTrackerConfig } from "./types"
 import { DEFAULT_PHASE_TRACKER_CONFIG } from "./types"
 import {
@@ -27,6 +28,15 @@ import {
 	buildChatMessagePhaseStatus,
 } from "./prompts"
 import { log, isReadOnlyBashCommand, isVerificationBashCommand } from "../../shared"
+
+type MessageWithParts = {
+	info: Message
+	parts: Part[]
+}
+
+type MessagesTransformOutput = { messages: MessageWithParts[] }
+
+const MAX_STATUS_LENGTH = 400
 
 export function createMethodologyPhaseTrackerHook(
 	_ctx: PluginInput,
@@ -148,6 +158,48 @@ export function createMethodologyPhaseTrackerHook(
 		}
 	}
 
+	const messagesTransform = async (
+		_input: Record<string, never>,
+		output: MessagesTransformOutput,
+	): Promise<void> => {
+		try {
+			const sessionID = extractSessionID(output.messages)
+			if (!sessionID) return
+
+			const state = getSessionState(sessionID)
+			const statusText = buildChatMessagePhaseStatus(state)
+			if (!statusText) return
+
+			const truncated = statusText.length > MAX_STATUS_LENGTH
+				? statusText.slice(0, MAX_STATUS_LENGTH) + "\n..."
+				: statusText
+
+			const lastUser = output.messages.findLast((m) => m.info.role === "user")
+			if (!lastUser) return
+
+			const textIdx = lastUser.parts.findIndex(
+				(p) => p.type === "text" && (p as { text?: string }).text,
+			)
+			if (textIdx === -1) return
+
+			lastUser.parts.splice(textIdx, 0, {
+				id: `methodology_phase_${sessionID}`,
+				messageID: lastUser.info.id,
+				sessionID: (lastUser.info as { sessionID?: string }).sessionID ?? "",
+				type: "text",
+				text: truncated,
+				synthetic: true,
+			} as Part)
+
+			log("[methodology-phase-tracker] Injected phase status via messages.transform", {
+				sessionID,
+				phase: state.currentPhase,
+			})
+		} catch (e) {
+			log("[gaia-hook-safe] methodologyPhaseTracker messagesTransform failed", { error: e })
+		}
+	}
+
 	const event = async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
 		if (event.type !== "session.deleted") return
 		const props = event.properties as { info?: { id?: string } } | undefined
@@ -157,36 +209,19 @@ export function createMethodologyPhaseTrackerHook(
 		}
 	}
 
-	const chatMessage = async (
-		input: { sessionID: string },
-		output: { parts: Array<{ type: string; text?: string; [key: string]: unknown }> },
-	): Promise<void> => {
-		try {
-			if (!output?.parts || !Array.isArray(output.parts)) return
-			const state = getSessionState(input.sessionID)
-			const statusText = buildChatMessagePhaseStatus(state)
-			if (!statusText) return
-
-			const lastTextPart = output.parts.findLast((p) => p.type === "text" && typeof p.text === "string")
-			if (lastTextPart) {
-				lastTextPart.text = `${lastTextPart.text}\n\n${String(statusText)}`
-			}
-			log("[methodology-phase-tracker] Injected phase status into chat.message", {
-				sessionID: input.sessionID,
-				phase: state.currentPhase,
-			})
-		} catch (e) {
-			log("[gaia-hook-safe] methodologyPhaseTracker chatMessage failed", { error: e })
-		}
-	}
-
 	return {
 		"tool.execute.before": toolExecuteBefore,
 		"tool.execute.after": toolExecuteAfter,
 		"experimental.session.compacting": compacting,
-		"chat.message": chatMessage,
+		"experimental.chat.messages.transform": messagesTransform,
 		event,
 	}
 }
 
-
+function extractSessionID(messages: MessageWithParts[]): string | undefined {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const sid = (messages[i].info as { sessionID?: string }).sessionID
+		if (sid) return sid
+	}
+	return undefined
+}

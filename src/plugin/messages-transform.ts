@@ -1,6 +1,7 @@
 import type { Message, Part } from "@opencode-ai/sdk"
 
 import type { CreatedHooks } from "../create-hooks"
+import { log } from "../shared"
 
 type MessageWithParts = {
   info: Message
@@ -28,5 +29,29 @@ export function createMessagesTransformHandler(args: {
     await args.hooks.knowledgeProtection?.[
       "experimental.chat.messages.transform"
     ]?.(input, output)
+
+    try {
+      await args.hooks.keywordDetector?.[
+        "experimental.chat.messages.transform"
+      ]?.(input, output)
+    } catch (e) {
+      log("[gaia-hook-error] keywordDetector messagesTransform failed", { error: e })
+    }
+
+    try {
+      await args.hooks.methodologyPhaseTracker?.[
+        "experimental.chat.messages.transform"
+      ]?.(input, output)
+    } catch (e) {
+      log("[gaia-hook-error] methodologyPhaseTracker messagesTransform failed", { error: e })
+    }
+
+    try {
+      await args.hooks.taskLifecycleEnforcer?.[
+        "experimental.chat.messages.transform"
+      ]?.(input, output)
+    } catch (e) {
+      log("[gaia-hook-error] taskLifecycleEnforcer messagesTransform failed", { error: e })
+    }
   }
 }

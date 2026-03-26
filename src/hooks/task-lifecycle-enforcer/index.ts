@@ -1,4 +1,5 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import type { Message, Part } from "@opencode-ai/sdk"
 import type { TaskLifecycleConfig } from "./types"
 import { DEFAULT_TASK_LIFECYCLE_CONFIG } from "./types"
 import {
@@ -13,9 +14,18 @@ import { buildNoTaskCreatedReminder, buildCompactionCheckpoint, buildChatMessage
 import { extractTaskId, parseTaskOutput } from "./task-output-parser"
 import { log } from "../../shared"
 
+type MessageWithParts = {
+	info: Message
+	parts: Part[]
+}
+
+type MessagesTransformOutput = { messages: MessageWithParts[] }
+
 const EDIT_WRITE_TOOLS = new Set(["edit", "write", "bash", "interactive_bash", "ast_grep_replace"])
 const TASK_CREATE_TOOLS = new Set(["task_create"])
 const TASK_UPDATE_TOOLS = new Set(["task_update"])
+
+const MAX_STATUS_LENGTH = 400
 
 export function createTaskLifecycleEnforcerHook(
 	_ctx: PluginInput,
@@ -94,6 +104,47 @@ export function createTaskLifecycleEnforcerHook(
 		}
 	}
 
+	const messagesTransform = async (
+		_input: Record<string, never>,
+		output: MessagesTransformOutput,
+	): Promise<void> => {
+		try {
+			const sessionID = extractSessionID(output.messages)
+			if (!sessionID) return
+
+			const state = getSessionState(sessionID)
+			const statusText = buildChatMessageTaskStatus(state)
+			if (!statusText) return
+
+			const truncated = statusText.length > MAX_STATUS_LENGTH
+				? statusText.slice(0, MAX_STATUS_LENGTH) + "\n..."
+				: statusText
+
+			const lastUser = output.messages.findLast((m) => m.info.role === "user")
+			if (!lastUser) return
+
+			const textIdx = lastUser.parts.findIndex(
+				(p) => p.type === "text" && (p as { text?: string }).text,
+			)
+			if (textIdx === -1) return
+
+			lastUser.parts.splice(textIdx, 0, {
+				id: `task_lifecycle_${sessionID}`,
+				messageID: lastUser.info.id,
+				sessionID: (lastUser.info as { sessionID?: string }).sessionID ?? "",
+				type: "text",
+				text: truncated,
+				synthetic: true,
+			} as Part)
+
+			log("[task-lifecycle-enforcer] Injected task status via messages.transform", {
+				sessionID,
+			})
+		} catch (e) {
+			log("[gaia-hook-safe] taskLifecycleEnforcer messagesTransform failed", { error: e })
+		}
+	}
+
 	const event = async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
 		if (event.type !== "session.deleted") return
 		const props = event.properties as { info?: { id?: string } } | undefined
@@ -103,32 +154,18 @@ export function createTaskLifecycleEnforcerHook(
 		}
 	}
 
-	const chatMessage = async (
-		input: { sessionID: string },
-		output: { parts: Array<{ type: string; text?: string; [key: string]: unknown }> },
-	): Promise<void> => {
-		try {
-			if (!output?.parts || !Array.isArray(output.parts)) return
-			const state = getSessionState(input.sessionID)
-			const statusText = buildChatMessageTaskStatus(state)
-			if (!statusText) return
-
-			const lastTextPart = output.parts.findLast((p) => p.type === "text" && typeof p.text === "string")
-			if (lastTextPart) {
-				lastTextPart.text = `${lastTextPart.text}\n\n${String(statusText)}`
-			}
-			log("[task-lifecycle-enforcer] Injected task status into chat.message", {
-				sessionID: input.sessionID,
-			})
-		} catch (e) {
-			log("[gaia-hook-safe] taskLifecycleEnforcer chatMessage failed", { error: e })
-		}
-	}
-
 	return {
 		"tool.execute.after": toolExecuteAfter,
 		"experimental.session.compacting": compacting,
-		"chat.message": chatMessage,
+		"experimental.chat.messages.transform": messagesTransform,
 		event,
 	}
+}
+
+function extractSessionID(messages: MessageWithParts[]): string | undefined {
+	for (let i = messages.length - 1; i >= 0; i--) {
+		const sid = (messages[i].info as { sessionID?: string }).sessionID
+		if (sid) return sid
+	}
+	return undefined
 }
