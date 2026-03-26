@@ -65,3 +65,4 @@ export { createSessionEvidenceCollectorHook } from "./session-evidence-collector
 export { createFixLifecycleGateHook } from "./fix-lifecycle-gate"
 export { createCognitiveGovernanceHook } from "./cognitive-governance"
 export { createKGSSyncHook } from "./kgs-sync"
+export { createKnowledgeProtectionHook } from "./knowledge-protection"

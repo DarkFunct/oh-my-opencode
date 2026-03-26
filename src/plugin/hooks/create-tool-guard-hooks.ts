@@ -27,6 +27,7 @@ import {
   createRetrospectiveTriggerHook,
   createSessionEvidenceCollectorHook,
   createFixLifecycleGateHook,
+  createKnowledgeProtectionHook,
 } from "../../hooks"
 import {
   getOpenCodeVersion,
@@ -61,6 +62,7 @@ export type ToolGuardHooks = {
   retrospectiveTrigger: ReturnType<typeof createRetrospectiveTriggerHook> | null
   sessionEvidenceCollector: ReturnType<typeof createSessionEvidenceCollectorHook> | null
   fixLifecycleGate: ReturnType<typeof createFixLifecycleGateHook> | null
+  knowledgeProtection: ReturnType<typeof createKnowledgeProtectionHook> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -189,6 +191,10 @@ export function createToolGuardHooks(args: {
     ? safeHook("kgs-sync", () => createKGSSyncHook(ctx))
     : null
 
+  const knowledgeProtection = isHookEnabled("knowledge-protection")
+    ? safeHook("knowledge-protection", () => createKnowledgeProtectionHook(ctx))
+    : null
+
   return {
     commentChecker,
     toolOutputTruncator,
@@ -214,5 +220,6 @@ export function createToolGuardHooks(args: {
     sessionEvidenceCollector,
     fixLifecycleGate,
     kgsSync,
+    knowledgeProtection,
   }
 }
