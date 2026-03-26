@@ -28,6 +28,9 @@ export interface StructuralSignals {
 	matchCount?: number
 	filePath?: string
 	lineNumber?: number
+	// II-2: agent_output + file_modification signals
+	editSuccess?: boolean
+	taskStatus?: "completed" | "error" | "pending"
 }
 
 export type SignalClassification = "error" | "warning" | "info" | "ambiguous"
@@ -170,6 +173,15 @@ export interface CognitiveFailure {
 	directive: string
 }
 
+// V-1: Injection effectiveness tracking
+export interface InjectionEvent {
+	failureId: CognitiveFailureId | "cognitive_directive"
+	round: number
+	timestamp: number
+	resolved: boolean
+	resolvedRound?: number
+}
+
 export interface SessionCognitiveState {
 	// L1: Evidence collection
 	detectedErrors: DetectedError[]
@@ -206,4 +218,7 @@ export interface SessionCognitiveState {
 	currentLayer: CognitiveLayer
 	dimensionsCovered: Set<MethodologyDimension>
 	roundsSinceCaptureNeeded: number
+
+	// V-1: Injection effectiveness tracking
+	injectionHistory: InjectionEvent[]
 }

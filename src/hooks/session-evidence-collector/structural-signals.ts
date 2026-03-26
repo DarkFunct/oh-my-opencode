@@ -29,6 +29,14 @@ export function extractStructuralSignals(
 		signals.matchCount = extractMatchCount(output)
 	}
 
+	if (source === "file_modification") {
+		signals.editSuccess = extractEditSuccess(output)
+	}
+
+	if (source === "agent_output") {
+		signals.taskStatus = extractTaskStatus(output)
+	}
+
 	return signals
 }
 
@@ -75,5 +83,18 @@ function extractMatchCount(output: string): number | undefined {
 
 	if (output.includes("No matches found") || output.includes("0 matches")) return 0
 
+	return undefined
+}
+
+function extractEditSuccess(output: string): boolean | undefined {
+	if (/Edit applied successfully|Wrote file successfully/i.test(output)) return true
+	if (/oldString not found|Found multiple matches/i.test(output)) return false
+	return undefined
+}
+
+function extractTaskStatus(output: string): "completed" | "error" | "pending" | undefined {
+	if (/Status.*\*?\*?error\*?\*?|The task encountered an error|\[task ERROR\]/i.test(output)) return "error"
+	if (/Status.*\*?\*?completed?\*?\*?|task completed/i.test(output)) return "completed"
+	if (/Status.*\*?\*?pending\*?\*?|still in progress/i.test(output)) return "pending"
 	return undefined
 }

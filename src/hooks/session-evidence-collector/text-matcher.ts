@@ -76,7 +76,32 @@ const FILE_MODIFICATION_RULES: SourceAwareRule[] = [
 	},
 ]
 
-const ALL_RULES: SourceAwareRule[] = [...SHELL_ERROR_RULES, ...LSP_RULES, ...FILE_MODIFICATION_RULES]
+// II-1: agent_output error detection (task/background_output/skill_mcp)
+const AGENT_OUTPUT_RULES: SourceAwareRule[] = [
+	{
+		sourceTypes: ["agent_output"],
+		pattern: /Status.*\*?\*?error\*?\*?|The task encountered an error/i,
+		classification: "error",
+	},
+	{
+		sourceTypes: ["agent_output"],
+		pattern: /\[task ERROR\]/,
+		classification: "error",
+	},
+	{
+		sourceTypes: ["agent_output"],
+		pattern: /Failed|timed? ?out/i,
+		classification: "warning",
+		negationPatterns: [/tests?\s+failed/i, /\d+\s+fail/i],
+	},
+]
+
+const ALL_RULES: SourceAwareRule[] = [
+	...SHELL_ERROR_RULES,
+	...LSP_RULES,
+	...FILE_MODIFICATION_RULES,
+	...AGENT_OUTPUT_RULES,
+]
 
 const NEVER_ERROR_SOURCES: Set<SourceType> = new Set([
 	"search_result",

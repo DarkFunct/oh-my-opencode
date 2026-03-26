@@ -1,10 +1,12 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { Message, Part } from "@opencode-ai/sdk"
+import type { CognitiveFailureId } from "../cognitive-governance-shared/types"
 import { getCognitiveState, deleteCognitiveSession } from "../cognitive-governance-shared/state"
 import { assessCognition, determineCognitiveLayer } from "./conversation-analyzer"
 import { buildCognitiveDirective } from "./prompts"
 import { injectCognitiveDirective } from "./cognitive-injector"
 import { detectCognitiveFailureWarn } from "./failure-directives"
+import { recordInjection, checkInjectionResolutions } from "./injection-tracker"
 import { log } from "../../shared"
 
 type MessageWithParts = {
@@ -39,6 +41,9 @@ export function createCognitiveGovernanceHook(_ctx: PluginInput) {
 			if (!directive) return
 
 			injectCognitiveDirective(output.messages, sessionID, directive)
+
+			checkInjectionResolutions(state)
+			recordInjection(state, failureWarning ? extractFailureId(failureWarning) : "cognitive_directive")
 		} catch (e) {
 			log("[gaia-hook-safe] cognitiveGovernance transform failed", { error: e })
 		}
@@ -66,4 +71,12 @@ function extractSessionID(messages: MessageWithParts[]): string | undefined {
 		if (sid) return sid
 	}
 	return undefined
+}
+
+const FAILURE_ID_PATTERN = /\[F([1-5])/
+
+function extractFailureId(directive: string): CognitiveFailureId | "cognitive_directive" {
+	const match = directive.match(FAILURE_ID_PATTERN)
+	if (match) return `F${match[1]}` as CognitiveFailureId
+	return "cognitive_directive"
 }

@@ -30,6 +30,7 @@ function createDefaultState(): SessionCognitiveState {
 		currentLayer: "perception",
 		dimensionsCovered: new Set(),
 		roundsSinceCaptureNeeded: 0,
+		injectionHistory: [],
 	}
 }
 
