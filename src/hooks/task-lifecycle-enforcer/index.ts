@@ -9,9 +9,16 @@ import {
 	incrementEditWrite,
 	updateReminderTime,
 	deleteSession,
+	markTaskInProgress,
+	resetEditsSinceUpdate,
 } from "./state"
-import { buildNoTaskCreatedReminder, buildCompactionCheckpoint, buildChatMessageTaskStatus } from "./prompts"
+import {
+	buildCompactionCheckpoint,
+	buildChatMessageTaskStatus,
+	buildTL06Warning,
+} from "./prompts"
 import { extractTaskId, parseTaskError, parseTaskOutput } from "./task-output-parser"
+import { evaluateEditWriteGates, evaluateCompletionGates } from "./tl-gate-evaluator"
 import { log } from "../../shared"
 import { isSubagentSession } from "../../shared/task-ownership-policy"
 import { syncTaskLeaseSignal } from "./lease-sync"
@@ -68,6 +75,15 @@ export function createTaskLifecycleEnforcerHook(
 			if (TASK_UPDATE_TOOLS.has(normalized)) {
 				const parsed = parseTaskOutput(output.output)
 				if (parsed.status === "completed") {
+					const completionGate = evaluateCompletionGates(output.output)
+					if (completionGate.hardBlock) {
+						output.output = (output.output ?? "") + completionGate.appendMessages.join("")
+						log("[task-lifecycle-enforcer] TL-04 rejection: missing evidence", {
+							sessionID,
+							taskId: parsed.id,
+						})
+						return
+					}
 					markTaskCompleted(sessionID, parsed.id)
 					await syncTaskLeaseSignal({
 						directory: ctx.directory,
@@ -78,6 +94,7 @@ export function createTaskLifecycleEnforcerHook(
 					log("[task-lifecycle-enforcer] Task completed", { sessionID, taskId: parsed.id })
 				} else if (parsed.status === "in_progress" && parsed.id) {
 					markTaskCreated(sessionID, parsed.id)
+					markTaskInProgress(sessionID)
 					await syncTaskLeaseSignal({
 						directory: ctx.directory,
 						sessionID,
@@ -85,6 +102,8 @@ export function createTaskLifecycleEnforcerHook(
 						taskId: parsed.id,
 					})
 				} else {
+					// Any other task_update resets the edits-since counter
+					resetEditsSinceUpdate(sessionID)
 					const taskError = parseTaskError(output.output)
 					if (taskError) {
 						await syncTaskLeaseSignal({
@@ -101,23 +120,22 @@ export function createTaskLifecycleEnforcerHook(
 			if (EDIT_WRITE_TOOLS.has(normalized)) {
 				incrementEditWrite(sessionID)
 
-				const now = Date.now()
-				const cooldownMs = config.reminderCooldownSeconds * 1000
+				const gates = evaluateEditWriteGates(state, config)
+				if (gates.hardBlock) {
+					throw new Error(gates.hardBlock)
+				}
 
-				if (
-					!state.hasCreatedTask &&
-					state.editWriteCallCount >= config.editWriteBeforeTaskReminder &&
-					now - state.lastReminderTime > cooldownMs
-				) {
-					output.output = (output.output ?? "") + buildNoTaskCreatedReminder(state)
+				if (gates.appendMessages.length > 0) {
+					output.output = (output.output ?? "") + gates.appendMessages.join("")
 					updateReminderTime(sessionID)
-					log("[task-lifecycle-enforcer] Injected no-task reminder", {
+					log("[task-lifecycle-enforcer] Gate warnings injected", {
 						sessionID,
 						editWriteCount: state.editWriteCallCount,
 					})
 				}
 			}
 		} catch (e) {
+			if (e instanceof Error && e.message.startsWith("[TL-01]")) throw e
 			log("[gaia-hook-safe] taskLifecycleEnforcer after failed", { error: e })
 		}
 	}
@@ -130,6 +148,15 @@ export function createTaskLifecycleEnforcerHook(
 			if (!output?.context || !Array.isArray(output.context)) return
 			const state = getSessionState(input.sessionID)
 			output.context.push(buildCompactionCheckpoint(state))
+
+			if (state.activeTaskIds.size > 0) {
+				output.context.push(buildTL06Warning(Array.from(state.activeTaskIds)))
+				log("[task-lifecycle-enforcer] TL-06 warning: unresolved tasks at compaction", {
+					sessionID: input.sessionID,
+					activeTaskIds: Array.from(state.activeTaskIds),
+				})
+			}
+
 			log("[task-lifecycle-enforcer] Compaction checkpoint injected", {
 				sessionID: input.sessionID,
 			})

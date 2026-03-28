@@ -9,6 +9,8 @@ function createDefaultState(): TaskLifecycleSessionState {
 		taskCompletedCount: 0,
 		lastReminderTime: 0,
 		activeTaskIds: new Set<string>(),
+		hasInProgressTask: false,
+		editsSinceLastTaskUpdate: 0,
 	}
 }
 
@@ -40,6 +42,18 @@ export function markTaskCompleted(sessionID: string, taskId?: string): void {
 export function incrementEditWrite(sessionID: string): void {
 	const state = getSessionState(sessionID)
 	state.editWriteCallCount++
+	state.editsSinceLastTaskUpdate++
+}
+
+export function markTaskInProgress(sessionID: string): void {
+	const state = getSessionState(sessionID)
+	state.hasInProgressTask = true
+	state.editsSinceLastTaskUpdate = 0
+}
+
+export function resetEditsSinceUpdate(sessionID: string): void {
+	const state = getSessionState(sessionID)
+	state.editsSinceLastTaskUpdate = 0
 }
 
 export function updateReminderTime(sessionID: string): void {
