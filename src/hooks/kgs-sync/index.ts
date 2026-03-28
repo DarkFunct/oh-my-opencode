@@ -1,11 +1,21 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import * as OmoHooks from "@gaia/omo-hooks"
 import { getKGSStore } from "../../features/kgs"
+import { loadPluginConfig } from "../../plugin-config"
 import { log } from "../../shared"
+import { KnowledgeGraphOrchestrator } from "../kgs-sync-knowledge/knowledge-graph-orchestrator"
+import {
+  extractFilePathFromArgs,
+  extractFilePathFromMetadata,
+  isKnowledgeDocumentPath,
+  normalizeToolFilePath,
+} from "../kgs-sync-knowledge/path-resolution"
 
 const KGS_SYNC_LOG_PREFIX = "[kgs-sync]"
 
 const FILE_WRITE_TOOLS = new Set(["Write", "write", "Edit", "edit"])
+const READ_TOOLS = new Set(["Read", "read"])
+const TRACKED_FILE_TOOLS = new Set([...FILE_WRITE_TOOLS, ...READ_TOOLS])
 
 type SyncResult = {
   processed: boolean
@@ -48,29 +58,6 @@ function resolveSyncFactory(): KGSSyncFactory {
   return candidate as KGSSyncFactory
 }
 
-function extractFilePathFromArgs(args: Record<string, unknown>): string | null {
-  const candidate = args.filePath ?? args.file_path ?? args.path ?? args.file
-  return typeof candidate === "string" && candidate.length > 0 ? candidate : null
-}
-
-function extractFilePathFromOutput(
-  pendingPath: string | null,
-  output: { output: string; metadata: Record<string, unknown> },
-): string | null {
-  if (pendingPath) return pendingPath
-
-  const metaPath = output.metadata?.filePath ?? output.metadata?.file_path ?? output.metadata?.path
-  if (typeof metaPath === "string" && metaPath.length > 0) return metaPath
-
-  const text = output.output ?? ""
-
-  const verbMatch = text.match(/(?:updated|wrote|edited|created|modified|moved|deleted)\s+(?:\d+\s+bytes\s+to\s+)?(?:file\s+)?[`"]?([^\s`"\n]+\.[a-zA-Z0-9]{1,10})[`"]?/i)
-  if (verbMatch?.[1]) return verbMatch[1]
-
-  const absMatch = text.match(/(\/[^\s`"\n]+\.[a-zA-Z0-9]{1,10})/m)
-  return absMatch?.[1] ?? null
-}
-
 function inferChangeType(tool: string): "create" | "modify" {
   if (tool === "Write" || tool === "write") return "create"
   return "modify"
@@ -78,6 +65,11 @@ function inferChangeType(tool: string): "create" | "modify" {
 
 export function createKGSSyncHook(_ctx: PluginInput) {
   let adapter: KGSSyncAdapter | null = null
+  const projectRoot = typeof _ctx.directory === "string" ? _ctx.directory : process.cwd()
+  const pluginConfig = loadPluginConfig(projectRoot, _ctx)
+  const orchestrator = new KnowledgeGraphOrchestrator(projectRoot, {
+    knowledgeConfig: pluginConfig.kgs_sync?.knowledge,
+  })
   const pendingFilePaths = new Map<string, string>()
 
   function getAdapter(): KGSSyncAdapter {
@@ -116,7 +108,7 @@ export function createKGSSyncHook(_ctx: PluginInput) {
       input: { tool: string; callID?: string },
       output: { args: Record<string, unknown> },
     ) => {
-      if (!FILE_WRITE_TOOLS.has(input.tool) || !input.callID) return
+      if (!TRACKED_FILE_TOOLS.has(input.tool) || !input.callID) return
       const filePath = extractFilePathFromArgs(output.args)
       if (filePath) {
         pendingFilePaths.set(input.callID, filePath)
@@ -127,38 +119,63 @@ export function createKGSSyncHook(_ctx: PluginInput) {
       input: { tool: string; sessionID: string; callID: string },
       output: { title: string; output: string; metadata: Record<string, unknown> },
     ) => {
-      if (!FILE_WRITE_TOOLS.has(input.tool)) return
-
       const pending = input.callID ? pendingFilePaths.get(input.callID) ?? null : null
       if (input.callID) pendingFilePaths.delete(input.callID)
 
-      const filePath = extractFilePathFromOutput(pending, output)
+      const filePath = extractFilePathFromMetadata(pending, output)
+
+      if (READ_TOOLS.has(input.tool) && typeof output.output === "string" && filePath) {
+        const normalizedPath = normalizeToolFilePath(filePath, projectRoot)
+        if (isKnowledgeDocumentPath(normalizedPath)) {
+          output.output = await orchestrator.augmentReadOutput(normalizedPath, output.output)
+        }
+      }
+
+      if (!FILE_WRITE_TOOLS.has(input.tool)) return
+
       if (!filePath) {
         log(`${KGS_SYNC_LOG_PREFIX} No file path extracted`, { tool: input.tool })
         return
       }
 
+      const normalizedPath = normalizeToolFilePath(filePath, projectRoot)
+      if (isKnowledgeDocumentPath(normalizedPath)) {
+        await orchestrator.ingestKnowledgeDocument(normalizedPath, {
+          sessionID: input.sessionID,
+          tool: input.tool,
+          callID: input.callID,
+        })
+      }
+
       try {
         const syncAdapter = getAdapter()
         const changeType = inferChangeType(input.tool)
-        const projectRoot = typeof _ctx.directory === "string" ? _ctx.directory : process.cwd()
         syncAdapter.onFileChange(filePath, changeType, projectRoot)
-      } catch (error) {
-        log(`${KGS_SYNC_LOG_PREFIX} Unexpected error`, { error })
+      } catch (error: unknown) {
+        log(`${KGS_SYNC_LOG_PREFIX} Unexpected error`, {
+          error: error instanceof Error ? error.message : String(error),
+        })
       }
     },
 
     event: async (input: { event: { type: string; properties?: Record<string, unknown> } }) => {
       if (input.event.type !== "session.deleted") return
+
+      await orchestrator.replayOutbox()
+
       if (!adapter) return
 
       try {
         log(`${KGS_SYNC_LOG_PREFIX} Session deleted — flushing pending writes`)
         await adapter.flushAndDispose()
         adapter = null
-      } catch (error) {
-        log(`${KGS_SYNC_LOG_PREFIX} Flush on session delete failed`, { error })
-        try { adapter?.dispose(); } catch { /* best-effort cleanup */ }
+      } catch (error: unknown) {
+        log(`${KGS_SYNC_LOG_PREFIX} Flush on session delete failed`, {
+          error: error instanceof Error ? error.message : String(error),
+        })
+        if (adapter) {
+          adapter.dispose()
+        }
         adapter = null
       }
     },

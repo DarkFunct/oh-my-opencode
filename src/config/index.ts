@@ -20,4 +20,5 @@ export type {
   SisyphusTasksConfig,
   RuntimeFallbackConfig,
   FallbackModels,
+  KGSSyncConfig,
 } from "./schema"
