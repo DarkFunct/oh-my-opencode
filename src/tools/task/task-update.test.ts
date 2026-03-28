@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import { existsSync, rmSync, mkdirSync } from "fs"
 import { join } from "path"
+import type { PluginInput } from "@opencode-ai/plugin"
 import type { TaskObject } from "./types"
 import { createTaskUpdateTool } from "./task-update"
 
@@ -18,6 +19,13 @@ const TEST_ABORT_CONTROLLER = new AbortController()
 const TEST_CONTEXT = {
   sessionID: TEST_SESSION_ID,
   messageID: "test-message-123",
+  agent: "test-agent",
+  abort: TEST_ABORT_CONTROLLER.signal,
+}
+
+const OTHER_CONTEXT = {
+  sessionID: "other-session-999",
+  messageID: "test-message-other",
   agent: "test-agent",
   abort: TEST_ABORT_CONTROLLER.signal,
 }
@@ -115,12 +123,193 @@ describe("task_update tool", () => {
       const args = {
         id: taskId,
         status: "in_progress" as const,
+        metadata: {
+          targetFile: "src/foo.ts",
+          responsibility: "update handler",
+          verificationUnit: "unit:test-foo",
+        },
       }
       const resultStr = await tool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
 
       //#then
       expect(result.task.status).toBe("in_progress")
+      expect(typeof result.task.metadata.lastStatusChangeAtMs).toBe("number")
+      expect(result.task.metadata.ownerSessionID).toBe(TEST_SESSION_ID)
+    })
+
+    test("records completedAtMs when status transitions to completed", async () => {
+      //#given
+      const taskId = "T-test-125b"
+      const taskPath = join(TEST_DIR, `${taskId}.json`)
+      const initialTask: TaskObject = {
+        id: taskId,
+        subject: "Test subject",
+        description: "Test description",
+        status: "in_progress",
+        blocks: [],
+        blockedBy: [],
+        threadID: TEST_SESSION_ID,
+        metadata: {
+          priority: "high",
+        },
+      }
+      await Bun.write(taskPath, JSON.stringify(initialTask))
+
+      //#when
+      const resultStr = await tool.execute({ id: taskId, status: "completed" }, TEST_CONTEXT)
+      const result = JSON.parse(resultStr)
+
+      //#then
+      expect(result.task.status).toBe("completed")
+      expect(typeof result.task.metadata.completedAtMs).toBe("number")
+      expect(typeof result.task.metadata.lastStatusChangeAtMs).toBe("number")
+    })
+
+    test("blocks updates from non-owner session when task ownership is claimed", async () => {
+      //#given
+      const taskId = "T-test-125c"
+      const taskPath = join(TEST_DIR, `${taskId}.json`)
+      const initialTask: TaskObject = {
+        id: taskId,
+        subject: "Owner claimed task",
+        description: "",
+        status: "in_progress",
+        blocks: [],
+        blockedBy: [],
+        threadID: TEST_SESSION_ID,
+        metadata: {
+          ownerSessionID: TEST_SESSION_ID,
+          ownerClaimedAtMs: Date.now(),
+        },
+      }
+      await Bun.write(taskPath, JSON.stringify(initialTask))
+
+      //#when
+      const resultStr = await tool.execute({ id: taskId, status: "completed" }, OTHER_CONTEXT)
+      const result = JSON.parse(resultStr)
+
+      //#then
+      expect(result.error).toBe("ownership_conflict")
+      expect(result.ownerSessionID).toBe(TEST_SESSION_ID)
+    })
+
+    test("blocks transition to in_progress when unresolved blockers exist", async () => {
+      //#given
+      const blockerId = "T-test-blocker"
+      const taskId = "T-test-target"
+
+      await Bun.write(
+        join(TEST_DIR, `${blockerId}.json`),
+        JSON.stringify({
+          id: blockerId,
+          subject: "Blocker",
+          description: "",
+          status: "pending",
+          blocks: [],
+          blockedBy: [],
+          threadID: TEST_SESSION_ID,
+        }),
+      )
+
+      await Bun.write(
+        join(TEST_DIR, `${taskId}.json`),
+        JSON.stringify({
+          id: taskId,
+          subject: "Target",
+          description: "",
+          status: "pending",
+          blocks: [],
+          blockedBy: [blockerId],
+          threadID: TEST_SESSION_ID,
+        }),
+      )
+
+      //#when
+      const result = JSON.parse(
+        await tool.execute(
+          {
+            id: taskId,
+            status: "in_progress",
+            metadata: {
+              targetFile: "src/target.ts",
+              responsibility: "resolve blocker",
+              verificationUnit: "unit:test-target",
+            },
+          },
+          TEST_CONTEXT,
+        ),
+      )
+
+      //#then
+      expect(result.error).toBe("blocked_transition")
+      expect(result.blockedBy).toEqual([blockerId])
+    })
+
+    test("blocks transition to in_progress when granularity metadata is missing", async () => {
+      const taskId = "T-test-granularity"
+
+      await Bun.write(
+        join(TEST_DIR, `${taskId}.json`),
+        JSON.stringify({
+          id: taskId,
+          subject: "Granularity target",
+          description: "",
+          status: "pending",
+          blocks: [],
+          blockedBy: [],
+          threadID: TEST_SESSION_ID,
+        }),
+      )
+
+      const result = JSON.parse(await tool.execute({ id: taskId, status: "in_progress" }, TEST_CONTEXT))
+
+      expect(result.error).toBe("granularity_requirements_missing")
+      expect(result.missingFields).toEqual([
+        "targetFile",
+        "responsibility",
+        "verificationUnit",
+      ])
+    })
+
+    test("blocks update that introduces dependency cycle", async () => {
+      //#given
+      const taskA = "T-cycle-a"
+      const taskB = "T-cycle-b"
+
+      await Bun.write(
+        join(TEST_DIR, `${taskA}.json`),
+        JSON.stringify({
+          id: taskA,
+          subject: "Task A",
+          description: "",
+          status: "pending",
+          blocks: [],
+          blockedBy: [],
+          threadID: TEST_SESSION_ID,
+        }),
+      )
+
+      await Bun.write(
+        join(TEST_DIR, `${taskB}.json`),
+        JSON.stringify({
+          id: taskB,
+          subject: "Task B",
+          description: "",
+          status: "pending",
+          blocks: [],
+          blockedBy: [taskA],
+          threadID: TEST_SESSION_ID,
+        }),
+      )
+
+      //#when
+      const result = JSON.parse(
+        await tool.execute({ id: taskA, addBlockedBy: [taskB] }, TEST_CONTEXT),
+      )
+
+      //#then
+      expect(result.error).toBe("dependency_cycle")
     })
 
     test("additively appends to blocks array without replacing", async () => {
@@ -418,6 +607,11 @@ describe("task_update tool", () => {
         description: "New description",
         status: "in_progress" as const,
         owner: "alice",
+        metadata: {
+          targetFile: "src/foo.ts",
+          responsibility: "update owner",
+          verificationUnit: "unit:test-owner",
+        },
       }
       const resultStr = await tool.execute(args, TEST_CONTEXT)
       const result = JSON.parse(resultStr)
@@ -427,6 +621,43 @@ describe("task_update tool", () => {
       expect(result.task.description).toBe("New description")
       expect(result.task.status).toBe("in_progress")
       expect(result.task.owner).toBe("alice")
+    })
+
+    test("returns todoSync failure when sync fails", async () => {
+      //#given
+      const taskId = "T-test-135"
+      const taskPath = join(TEST_DIR, `${taskId}.json`)
+      const initialTask: TaskObject = {
+        id: taskId,
+        subject: "Original subject",
+        description: "Original description",
+        status: "pending",
+        blocks: [],
+        blockedBy: [],
+        threadID: TEST_SESSION_ID,
+      }
+      await Bun.write(taskPath, JSON.stringify(initialTask))
+
+      const mockCtx = {
+        directory: TEST_DIR,
+        client: {
+          session: {
+            todo: async () => {
+              throw new Error("todo-sync-down")
+            },
+          },
+        },
+      } as unknown as PluginInput
+      const toolWithCtx = createTaskUpdateTool(TEST_CONFIG, mockCtx)
+
+      //#when
+      const resultStr = await toolWithCtx.execute({ id: taskId, subject: "Updated subject" }, TEST_CONTEXT)
+      const result = JSON.parse(resultStr)
+
+      //#then
+      expect(result.task.subject).toBe("Updated subject")
+      expect(result.todoSync.status).toBe("failed")
+      expect(result.todoSync.reason).toContain("todo-sync-down")
     })
   })
 })

@@ -2930,60 +2930,53 @@ describe("sisyphus-task", () => {
   })
 
   describe("buildSystemContent", () => {
-    test("returns undefined when no skills and no category promptAppend", () => {
-      // given
+    test("returns methodology chain when no skills and no category promptAppend", () => {
       const { buildSystemContent } = require("./tools")
+      const { getMethodologyChainInjection } = require("./methodology-chain-inject")
 
-      // when
       const result = buildSystemContent({ skillContent: undefined, categoryPromptAppend: undefined })
 
-      // then
-      expect(result).toBeUndefined()
+      expect(result).toBe(getMethodologyChainInjection())
     })
 
-    test("returns skill content only when skills provided without category", () => {
-      // given
+    test("includes skill content and methodology chain when skills provided without category", () => {
       const { buildSystemContent } = require("./tools")
+      const { getMethodologyChainInjection } = require("./methodology-chain-inject")
       const skillContent = "You are a playwright expert"
 
-      // when
       const result = buildSystemContent({ skillContent, categoryPromptAppend: undefined })
 
-      // then
-      expect(result).toBe(skillContent)
+      expect(result).toContain(skillContent)
+      expect(result).toContain(getMethodologyChainInjection())
     })
 
-    test("returns category promptAppend only when no skills", () => {
-      // given
+    test("includes category promptAppend and methodology chain when no skills", () => {
       const { buildSystemContent } = require("./tools")
+      const { getMethodologyChainInjection } = require("./methodology-chain-inject")
       const categoryPromptAppend = "Focus on visual design"
 
-      // when
       const result = buildSystemContent({ skillContent: undefined, categoryPromptAppend })
 
-      // then
-      expect(result).toBe(categoryPromptAppend)
+      expect(result).toContain(categoryPromptAppend)
+      expect(result).toContain(getMethodologyChainInjection())
     })
 
     test("combines skill content and category promptAppend with separator", () => {
-      // given
       const { buildSystemContent } = require("./tools")
       const skillContent = "You are a playwright expert"
       const categoryPromptAppend = "Focus on visual design"
 
-      // when
       const result = buildSystemContent({ skillContent, categoryPromptAppend })
 
-      // then
       expect(result).toContain(skillContent)
       expect(result).toContain(categoryPromptAppend)
       expect(result).toContain("\n\n")
     })
 
     test("prepends plan agent system prompt when agentName is 'plan'", () => {
-      // given
       const { buildSystemContent } = require("./tools")
       const { buildPlanAgentSystemPrepend } = require("./constants")
+      const { getMethodologyChainInjection } = require("./methodology-chain-inject")
 
       const availableCategories = [
         {
@@ -3000,56 +2993,52 @@ describe("sisyphus-task", () => {
         },
       ]
 
-      // when
       const result = buildSystemContent({
         agentName: "plan",
         availableCategories,
         availableSkills,
       })
 
-      // then
       expect(result).toContain("<system>")
       expect(result).toContain("MANDATORY CONTEXT GATHERING PROTOCOL")
       expect(result).toContain("### AVAILABLE CATEGORIES")
       expect(result).toContain("`deep`")
       expect(result).not.toContain("prompt-engineer")
-      expect(result).toBe(buildPlanAgentSystemPrepend(availableCategories, availableSkills))
+      expect(result).toContain(buildPlanAgentSystemPrepend(availableCategories, availableSkills))
+      expect(result).toContain(getMethodologyChainInjection())
     })
 
     test("does not prepend plan agent prompt for prometheus agent", () => {
-      //#given - prometheus is NOT a plan agent (decoupled)
       const { buildSystemContent } = require("./tools")
+      const { getMethodologyChainInjection } = require("./methodology-chain-inject")
       const skillContent = "You are a strategic planner"
 
-      //#when
       const result = buildSystemContent({
         skillContent,
         agentName: "prometheus",
       })
 
-      //#then - prometheus should NOT get plan agent system prepend
-      expect(result).toBe(skillContent)
+      expect(result).toContain(skillContent)
+      expect(result).toContain(getMethodologyChainInjection())
       expect(result).not.toContain("MANDATORY CONTEXT GATHERING PROTOCOL")
     })
 
     test("does not prepend plan agent prompt for Prometheus (case insensitive)", () => {
-      //#given - Prometheus (capitalized) is NOT a plan agent
       const { buildSystemContent } = require("./tools")
+      const { getMethodologyChainInjection } = require("./methodology-chain-inject")
       const skillContent = "You are a strategic planner"
 
-      //#when
       const result = buildSystemContent({
         skillContent,
         agentName: "Prometheus",
       })
 
-      //#then
-      expect(result).toBe(skillContent)
+      expect(result).toContain(skillContent)
+      expect(result).toContain(getMethodologyChainInjection())
       expect(result).not.toContain("MANDATORY CONTEXT GATHERING PROTOCOL")
     })
 
     test("combines plan agent prepend with skill content", () => {
-      // given
       const { buildSystemContent } = require("./tools")
       const { buildPlanAgentSystemPrepend } = require("./constants")
       const skillContent = "You are a planning expert"
@@ -3070,7 +3059,6 @@ describe("sisyphus-task", () => {
       ]
       const planPrepend = buildPlanAgentSystemPrepend(availableCategories, availableSkills)
 
-      // when
       const result = buildSystemContent({
         skillContent,
         agentName: "plan",
@@ -3078,35 +3066,32 @@ describe("sisyphus-task", () => {
         availableSkills,
       })
 
-      // then
       expect(result).toContain(planPrepend)
       expect(result).toContain(skillContent)
       expect(result!.indexOf(planPrepend)).toBeLessThan(result!.indexOf(skillContent))
     })
 
     test("does not prepend plan agent prompt for non-plan agents", () => {
-      // given
       const { buildSystemContent } = require("./tools")
+      const { getMethodologyChainInjection } = require("./methodology-chain-inject")
       const skillContent = "You are an expert"
 
-      // when
       const result = buildSystemContent({ skillContent, agentName: "oracle" })
 
-      // then
-      expect(result).toBe(skillContent)
+      expect(result).toContain(skillContent)
+      expect(result).toContain(getMethodologyChainInjection())
       expect(result).not.toContain("<system>")
     })
 
     test("does not prepend plan agent prompt when agentName is undefined", () => {
-      // given
       const { buildSystemContent } = require("./tools")
+      const { getMethodologyChainInjection } = require("./methodology-chain-inject")
       const skillContent = "You are an expert"
 
-      // when
       const result = buildSystemContent({ skillContent, agentName: undefined })
 
-      // then
-      expect(result).toBe(skillContent)
+      expect(result).toContain(skillContent)
+      expect(result).toContain(getMethodologyChainInjection())
       expect(result).not.toContain("<system>")
     })
   })

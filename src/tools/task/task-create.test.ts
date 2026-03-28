@@ -1,6 +1,7 @@
 import { describe, test, expect, beforeEach, afterEach } from "bun:test"
 import { existsSync, rmSync, mkdirSync } from "fs"
 import { join } from "path"
+import type { PluginInput } from "@opencode-ai/plugin"
 import type { TaskObject } from "./types"
 import { createTaskCreateTool } from "./task-create"
 
@@ -174,7 +175,31 @@ describe("task_create tool", () => {
       //#then
       const taskFile = join(TEST_DIR, `${taskId}.json`)
       const taskContent = JSON.parse(await Bun.file(taskFile).text())
-      expect(taskContent.metadata).toEqual({ priority: "high", tags: ["urgent"] })
+      expect(taskContent.metadata.priority).toBe("high")
+      expect(taskContent.metadata.tags).toEqual(["urgent"])
+      expect(typeof taskContent.metadata.createdAtMs).toBe("number")
+      expect(typeof taskContent.metadata.lastStatusChangeAtMs).toBe("number")
+    })
+
+    test("records creation timestamps in metadata", async () => {
+      //#given
+      const args = {
+        subject: "Task with timestamps",
+      }
+
+      //#when
+      const resultStr = await tool.execute(args, TEST_CONTEXT)
+      const result = JSON.parse(resultStr)
+      const taskId = result.task.id
+      const taskFile = join(TEST_DIR, `${taskId}.json`)
+      const taskContent = JSON.parse(await Bun.file(taskFile).text())
+
+      //#then
+      expect(typeof taskContent.metadata.createdAtMs).toBe("number")
+      expect(typeof taskContent.metadata.lastStatusChangeAtMs).toBe("number")
+      expect(taskContent.metadata.lastStatusChangeAtMs).toBe(taskContent.metadata.createdAtMs)
+      expect(taskContent.metadata.ownerSessionID).toBe(TEST_SESSION_ID)
+      expect(typeof taskContent.metadata.ownerClaimedAtMs).toBe("number")
     })
 
     test("accepts optional blockedBy array", async () => {
@@ -296,6 +321,38 @@ describe("task_create tool", () => {
       expect(taskContent.id).toBe(taskId)
       expect(taskContent.subject).toBe("Test task")
       expect(taskContent.description).toBe("Test description")
+    })
+
+    test("returns todoSync failure when sync fails", async () => {
+      //#given
+      const mockCtx = {
+        directory: TEST_DIR,
+        client: {
+          session: {
+            todo: async () => {
+              throw new Error("todo-sync-down")
+            },
+          },
+        },
+      } as unknown as PluginInput
+      const toolWithCtx = createTaskCreateTool(TEST_CONFIG, mockCtx)
+
+      //#when
+      const resultStr = await toolWithCtx.execute({ subject: "Task with todo sync failure" }, TEST_CONTEXT)
+      const result = JSON.parse(resultStr)
+
+      //#then
+      expect(result.task.subject).toBe("Task with todo sync failure")
+      expect(result.todoSync.status).toBe("failed")
+      expect(result.todoSync.reason).toContain("todo-sync-down")
+      expect(typeof result.todoSync.visibleWithinMs).toBe("number")
+      expect(typeof result.todoSync.timeoutMs).toBe("number")
+
+      const taskFile = join(TEST_DIR, `${result.task.id}.json`)
+      const taskContent = JSON.parse(await Bun.file(taskFile).text())
+      expect(typeof taskContent.metadata.todoSyncLastFailureAtMs).toBe("number")
+      expect(taskContent.metadata.todoSyncLastFailureReason).toContain("todo-sync-down")
+      expect(typeof taskContent.metadata.todoSyncLastFailureVisibleWithinMs).toBe("number")
     })
   })
 })

@@ -68,7 +68,7 @@ export function createTransformHooks(args: {
   const cognitiveGovernance = isHookEnabled("cognitive-governance")
     ? safeCreateHook(
         "cognitive-governance",
-        () => createCognitiveGovernanceHook(ctx),
+        () => createCognitiveGovernanceHook(ctx, pluginConfig.cognitive_governance),
         { enabled: safeHookEnabled },
       )
     : null

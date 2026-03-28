@@ -24,6 +24,8 @@ import {
   createTaskGetTool,
   createTaskList,
   createTaskUpdateTool,
+  createTaskHealthTool,
+  createTaskReconcileTool,
   createHashlineEditTool,
   createKGSQueryTool,
   createKGSArchTool,
@@ -123,6 +125,8 @@ export function createToolRegistry(args: {
         task_get: createTaskGetTool(pluginConfig),
         task_list: createTaskList(pluginConfig),
         task_update: createTaskUpdateTool(pluginConfig, ctx),
+        task_health: createTaskHealthTool(pluginConfig, managers.backgroundManager),
+        task_reconcile: createTaskReconcileTool(pluginConfig, ctx),
       }
     : {}
 

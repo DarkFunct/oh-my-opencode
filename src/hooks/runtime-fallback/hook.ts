@@ -22,6 +22,7 @@ export function createRuntimeFallbackHook(
     cooldown_seconds: options?.config?.cooldown_seconds ?? DEFAULT_CONFIG.cooldown_seconds,
     timeout_seconds: options?.config?.timeout_seconds ?? DEFAULT_CONFIG.timeout_seconds,
     notify_on_fallback: options?.config?.notify_on_fallback ?? DEFAULT_CONFIG.notify_on_fallback,
+    ladders: options?.config?.ladders ?? DEFAULT_CONFIG.ladders,
   }
 
   let pluginConfig = options?.pluginConfig

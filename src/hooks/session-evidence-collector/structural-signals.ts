@@ -3,8 +3,17 @@ import type { SourceType, StructuralSignals } from "../cognitive-governance-shar
 export function extractFilePath(tool: string, args: Record<string, unknown>): string | undefined {
 	if (typeof args.filePath === "string") return args.filePath
 	if (typeof args.file_path === "string") return args.file_path
+	if (tool === "apply_patch" && typeof args.patchText === "string") {
+		const patchPath = extractPatchPath(args.patchText)
+		if (patchPath) return patchPath
+	}
 	if (tool === "bash" && typeof args.command === "string") return undefined
 	return undefined
+}
+
+function extractPatchPath(patchText: string): string | undefined {
+	const match = patchText.match(/^\*\*\*\s+(?:Add|Update|Delete)\s+File:\s+(.+)$/im)
+	return match?.[1]?.trim()
 }
 
 export function extractStructuralSignals(

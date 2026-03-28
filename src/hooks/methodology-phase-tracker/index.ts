@@ -17,6 +17,7 @@ import {
 	classifyToolPhase,
 	isExecuteTool,
 	isReadTool,
+	isCaptureToolCall,
 	isTaskCompletionCall,
 	isCaptureSignalPresent,
 } from "./phase-detector"
@@ -68,6 +69,10 @@ export function createMethodologyPhaseTrackerHook(
 			const phase = isBashNonWrite ? "read" : classifyToolPhase(tool)
 			if (phase) {
 				transitionPhase(sessionID, phase, tool)
+			}
+
+			if (isCaptureToolCall(tool, _output.args)) {
+				transitionPhase(sessionID, "capture", tool)
 			}
 
 			if (isReadTool(tool) || isBashNonWrite) {

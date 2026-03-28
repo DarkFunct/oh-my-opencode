@@ -3314,6 +3314,298 @@
       },
       "additionalProperties": false
     },
+    "cognitive_governance": {
+      "type": "object",
+      "properties": {
+        "directive_budget": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "mode": {
+              "default": "priority_prune",
+              "type": "string",
+              "enum": [
+                "priority_prune",
+                "legacy_truncate"
+              ]
+            },
+            "max_injection_length": {
+              "default": 500,
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 2000
+            },
+            "append_omission_notice": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "enabled",
+            "mode",
+            "max_injection_length",
+            "append_omission_notice"
+          ],
+          "additionalProperties": false
+        },
+        "methodology_chain_audit": {
+          "type": "object",
+          "properties": {
+            "min_output_length_for_audit": {
+              "default": 100,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10000
+            }
+          },
+          "required": [
+            "min_output_length_for_audit"
+          ],
+          "additionalProperties": false
+        },
+        "methodology_phase_tracker": {
+          "type": "object",
+          "properties": {
+            "capture_reminder_threshold": {
+              "default": 5,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "execute_without_read_threshold": {
+              "default": 3,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "reminder_cooldown_seconds": {
+              "default": 60,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3600
+            }
+          },
+          "required": [
+            "capture_reminder_threshold",
+            "execute_without_read_threshold",
+            "reminder_cooldown_seconds"
+          ],
+          "additionalProperties": false
+        },
+        "task_lifecycle_enforcer": {
+          "type": "object",
+          "properties": {
+            "edit_write_before_task_reminder": {
+              "default": 2,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 100
+            },
+            "reminder_cooldown_seconds": {
+              "default": 90,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3600
+            }
+          },
+          "required": [
+            "edit_write_before_task_reminder",
+            "reminder_cooldown_seconds"
+          ],
+          "additionalProperties": false
+        },
+        "post_execution_verifier": {
+          "type": "object",
+          "properties": {
+            "verification_reminder_interval": {
+              "default": 8,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            },
+            "reminder_cooldown_seconds": {
+              "default": 120,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3600
+            }
+          },
+          "required": [
+            "verification_reminder_interval",
+            "reminder_cooldown_seconds"
+          ],
+          "additionalProperties": false
+        },
+        "behavioral_governance": {
+          "type": "object",
+          "properties": {
+            "ratio_threshold": {
+              "default": 3,
+              "type": "number",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "checkpoint_interval": {
+              "default": 15,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            },
+            "min_bash_samples_for_ratio_gate": {
+              "default": 6,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            },
+            "cognitive_markers_threshold": {
+              "default": 3,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            }
+          },
+          "required": [
+            "ratio_threshold",
+            "checkpoint_interval",
+            "min_bash_samples_for_ratio_gate",
+            "cognitive_markers_threshold"
+          ],
+          "additionalProperties": false
+        },
+        "pre_flight_guard": {
+          "type": "object",
+          "properties": {
+            "min_read_before_execute": {
+              "default": 1,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "grace_window_seconds": {
+              "default": 30,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 3600
+            }
+          },
+          "required": [
+            "min_read_before_execute",
+            "grace_window_seconds"
+          ],
+          "additionalProperties": false
+        },
+        "fix_lifecycle_gate": {
+          "type": "object",
+          "properties": {
+            "repeat_fix_threshold": {
+              "default": 3,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "same_file_fix_threshold": {
+              "default": 2,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "capture_hard_block_threshold": {
+              "default": 4,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "execute_activity_threshold": {
+              "default": 3,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "f3_block_threshold": {
+              "default": 5,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            },
+            "f2_f4_block_threshold": {
+              "default": 3,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          "required": [
+            "repeat_fix_threshold",
+            "same_file_fix_threshold",
+            "capture_hard_block_threshold",
+            "execute_activity_threshold",
+            "f3_block_threshold",
+            "f2_f4_block_threshold"
+          ],
+          "additionalProperties": false
+        },
+        "documentation_auto_management": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "docs_root": {
+              "default": "docs",
+              "type": "string",
+              "minLength": 1
+            },
+            "registry_file": {
+              "default": "docs/README.md",
+              "type": "string",
+              "minLength": 1
+            },
+            "max_report_items": {
+              "default": 8,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          "required": [
+            "enabled",
+            "docs_root",
+            "registry_file",
+            "max_report_items"
+          ],
+          "additionalProperties": false
+        },
+        "perception_defaults": {
+          "type": "object",
+          "properties": {
+            "include_perception_defaults": {
+              "default": true,
+              "type": "boolean"
+            },
+            "max_chars_per_file": {
+              "default": 12000,
+              "type": "integer",
+              "minimum": 100,
+              "maximum": 200000
+            },
+            "workspace_root": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "required": [
+            "include_perception_defaults",
+            "max_chars_per_file"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "experimental": {
       "type": "object",
       "properties": {
@@ -3645,6 +3937,40 @@
             },
             "notify_on_fallback": {
               "type": "boolean"
+            },
+            "ladders": {
+              "type": "object",
+              "properties": {
+                "onRateLimit": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "onAuthError": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "onThinkingIncompatible": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "onModelUnavailable": {
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                }
+              },
+              "additionalProperties": false
             }
           },
           "additionalProperties": false
@@ -3952,6 +4278,70 @@
       },
       "additionalProperties": false
     },
+    "kgs_sync": {
+      "type": "object",
+      "properties": {
+        "knowledge": {
+          "type": "object",
+          "properties": {
+            "mode": {
+              "type": "string",
+              "enum": [
+                "dual",
+                "markdown_only"
+              ]
+            },
+            "read_source_mode": {
+              "type": "string",
+              "enum": [
+                "hybrid",
+                "local_only",
+                "kgs_only"
+              ]
+            },
+            "read_augment": {
+              "type": "boolean"
+            },
+            "outbox_replay": {
+              "type": "boolean"
+            }
+          },
+          "additionalProperties": false
+        },
+        "task_maintenance_safety": {
+          "type": "object",
+          "properties": {
+            "max_reconcile_per_run": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "max_failures_per_run": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "orphan_grace_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 86400000
+            },
+            "max_invalid_file_removals_per_run": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 500
+            },
+            "min_invalid_file_age_ms": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 86400000
+            }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    },
     "tmux": {
       "type": "object",
       "properties": {
@@ -4027,10 +4417,30 @@
         "auto_commit": {
           "default": true,
           "type": "boolean"
+        },
+        "governance_precheck_enabled": {
+          "default": true,
+          "type": "boolean"
+        },
+        "governance_precheck_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "governance_precheck_timeout_ms": {
+          "default": 5000,
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "governance_runtime_policy_version": {
+          "type": "string",
+          "minLength": 1
         }
       },
       "required": [
-        "auto_commit"
+        "auto_commit",
+        "governance_precheck_enabled",
+        "governance_precheck_timeout_ms"
       ],
       "additionalProperties": false
     },

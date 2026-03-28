@@ -11,6 +11,8 @@ import {
   generateTaskId,
 } from "../../features/claude-tasks/storage";
 import { syncTaskTodoUpdate } from "./todo-sync";
+import { claimOwnershipIfMissing } from "./task-lifecycle-metadata";
+import { applyTodoSyncOutcomeMetadata } from "./task-todo-sync-metadata";
 import { canCreatePersistentTask } from "../../shared/task-ownership-policy";
 
 export function createTaskCreateTool(
@@ -78,6 +80,7 @@ async function handleCreate(
 
     try {
       const taskId = generateTaskId();
+      const now = Date.now();
       const task: TaskObject = {
         id: taskId,
         subject: validatedArgs.subject,
@@ -86,23 +89,68 @@ async function handleCreate(
         blocks: validatedArgs.blocks ?? [],
         blockedBy: validatedArgs.blockedBy ?? [],
         activeForm: validatedArgs.activeForm,
-        metadata: validatedArgs.metadata,
+        metadata: {
+          ...(validatedArgs.metadata ?? {}),
+          createdAtMs: now,
+          lastStatusChangeAtMs: now,
+        },
         repoURL: validatedArgs.repoURL,
         parentID: validatedArgs.parentID,
         threadID: context.sessionID,
       };
+      claimOwnershipIfMissing(task, context.sessionID, now);
 
       const validatedTask = TaskObjectSchema.parse(task);
-      writeJsonAtomic(join(taskDir, `${taskId}.json`), validatedTask);
+      const taskPath = join(taskDir, `${taskId}.json`);
+      writeJsonAtomic(taskPath, validatedTask);
 
-      await syncTaskTodoUpdate(ctx, validatedTask, context.sessionID);
+      const todoSyncResult = await syncTaskTodoUpdate(ctx, validatedTask, context.sessionID);
+      const taskWithTodoOutcome = TaskObjectSchema.parse({
+        ...validatedTask,
+        metadata: { ...(validatedTask.metadata ?? {}) },
+      });
+      applyTodoSyncOutcomeMetadata(taskWithTodoOutcome, todoSyncResult, Date.now());
+      writeJsonAtomic(taskPath, taskWithTodoOutcome);
 
-      return JSON.stringify({
+      const response: {
+        task: {
+          id: string
+          subject: string
+        }
+        todoSync?: {
+          status: "failed"
+          reason: string
+          visibleWithinMs?: number
+          timeoutMs?: number
+          withinSla?: boolean
+        }
+      } = {
         task: {
           id: validatedTask.id,
           subject: validatedTask.subject,
         },
-      });
+      };
+
+      if (todoSyncResult.status === "failed") {
+        response.todoSync = {
+          status: "failed",
+          reason: todoSyncResult.reason ?? "unknown",
+          ...(typeof todoSyncResult.visibleWithinMs === "number"
+            ? { visibleWithinMs: todoSyncResult.visibleWithinMs }
+            : {}),
+          ...(typeof todoSyncResult.timeoutMs === "number"
+            ? {
+                timeoutMs: todoSyncResult.timeoutMs,
+                withinSla:
+                  typeof todoSyncResult.visibleWithinMs === "number"
+                    ? todoSyncResult.visibleWithinMs <= todoSyncResult.timeoutMs
+                    : false,
+              }
+            : {}),
+        };
+      }
+
+      return JSON.stringify(response);
     } finally {
       lock.release();
     }

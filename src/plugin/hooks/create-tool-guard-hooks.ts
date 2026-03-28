@@ -29,6 +29,7 @@ import {
   createFixLifecycleGateHook,
   createKnowledgeProtectionHook,
   createToolAbortRecoveryHook,
+  createTaskHealthHook,
 } from "../../hooks"
 import {
   getOpenCodeVersion,
@@ -65,6 +66,7 @@ export type ToolGuardHooks = {
   fixLifecycleGate: ReturnType<typeof createFixLifecycleGateHook> | null
   knowledgeProtection: ReturnType<typeof createKnowledgeProtectionHook> | null
   toolAbortRecovery: ReturnType<typeof createToolAbortRecoveryHook> | null
+  taskHealth: ReturnType<typeof createTaskHealthHook> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -150,11 +152,23 @@ export function createToolGuardHooks(args: {
     : null
 
   const methodologyChainAudit = isHookEnabled("methodology-chain-audit")
-    ? safeHook("methodology-chain-audit", () => createMethodologyChainAuditHook(ctx))
+    ? safeHook("methodology-chain-audit", () =>
+        createMethodologyChainAuditHook(ctx, {
+          minOutputLengthForAudit:
+            pluginConfig.cognitive_governance?.methodology_chain_audit?.min_output_length_for_audit,
+        }))
     : null
 
   const behavioralGovernance = isHookEnabled("behavioral-governance")
-    ? safeHook("behavioral-governance", () => createBehavioralGovernanceHook(ctx))
+    ? safeHook("behavioral-governance", () =>
+        createBehavioralGovernanceHook(ctx, {
+          ratioThreshold: pluginConfig.cognitive_governance?.behavioral_governance?.ratio_threshold,
+          checkpointInterval: pluginConfig.cognitive_governance?.behavioral_governance?.checkpoint_interval,
+          minBashSamplesForRatioGate:
+            pluginConfig.cognitive_governance?.behavioral_governance?.min_bash_samples_for_ratio_gate,
+          cognitiveMarkersThreshold:
+            pluginConfig.cognitive_governance?.behavioral_governance?.cognitive_markers_threshold,
+        }))
     : null
 
   const kgsGuard = isHookEnabled("kgs-guard")
@@ -162,19 +176,45 @@ export function createToolGuardHooks(args: {
     : null
 
   const methodologyPhaseTracker = isHookEnabled("methodology-phase-tracker")
-    ? safeHook("methodology-phase-tracker", () => createMethodologyPhaseTrackerHook(ctx))
+    ? safeHook("methodology-phase-tracker", () =>
+        createMethodologyPhaseTrackerHook(ctx, {
+          captureReminderThreshold:
+            pluginConfig.cognitive_governance?.methodology_phase_tracker?.capture_reminder_threshold,
+          executeWithoutReadThreshold:
+            pluginConfig.cognitive_governance?.methodology_phase_tracker?.execute_without_read_threshold,
+          reminderCooldownSeconds:
+            pluginConfig.cognitive_governance?.methodology_phase_tracker?.reminder_cooldown_seconds,
+        }))
     : null
 
   const taskLifecycleEnforcer = isHookEnabled("task-lifecycle-enforcer")
-    ? safeHook("task-lifecycle-enforcer", () => createTaskLifecycleEnforcerHook(ctx))
+    ? safeHook("task-lifecycle-enforcer", () =>
+        createTaskLifecycleEnforcerHook(ctx, {
+          editWriteBeforeTaskReminder:
+            pluginConfig.cognitive_governance?.task_lifecycle_enforcer?.edit_write_before_task_reminder,
+          reminderCooldownSeconds:
+            pluginConfig.cognitive_governance?.task_lifecycle_enforcer?.reminder_cooldown_seconds,
+        }))
     : null
 
   const preFlightGuard = isHookEnabled("pre-flight-guard")
-    ? safeHook("pre-flight-guard", () => createPreFlightGuardHook(ctx))
+    ? safeHook("pre-flight-guard", () =>
+        createPreFlightGuardHook(ctx, {
+          minReadBeforeExecute:
+            pluginConfig.cognitive_governance?.pre_flight_guard?.min_read_before_execute,
+          graceWindowSeconds:
+            pluginConfig.cognitive_governance?.pre_flight_guard?.grace_window_seconds,
+        }))
     : null
 
   const postExecutionVerifier = isHookEnabled("post-execution-verifier")
-    ? safeHook("post-execution-verifier", () => createPostExecutionVerifierHook(ctx))
+    ? safeHook("post-execution-verifier", () =>
+        createPostExecutionVerifierHook(ctx, {
+          verificationReminderInterval:
+            pluginConfig.cognitive_governance?.post_execution_verifier?.verification_reminder_interval,
+          reminderCooldownSeconds:
+            pluginConfig.cognitive_governance?.post_execution_verifier?.reminder_cooldown_seconds,
+        }))
     : null
 
   const retrospectiveTrigger = isHookEnabled("retrospective-trigger")
@@ -182,11 +222,31 @@ export function createToolGuardHooks(args: {
     : null
 
   const sessionEvidenceCollector = isHookEnabled("session-evidence-collector")
-    ? safeHook("session-evidence-collector", () => createSessionEvidenceCollectorHook(ctx))
+    ? safeHook("session-evidence-collector", () =>
+        createSessionEvidenceCollectorHook(ctx, {
+          enabled: pluginConfig.cognitive_governance?.documentation_auto_management?.enabled,
+          docsRoot: pluginConfig.cognitive_governance?.documentation_auto_management?.docs_root,
+          registryFile: pluginConfig.cognitive_governance?.documentation_auto_management?.registry_file,
+          maxReportItems: pluginConfig.cognitive_governance?.documentation_auto_management?.max_report_items,
+        }))
     : null
 
   const fixLifecycleGate = isHookEnabled("fix-lifecycle-gate")
-    ? safeHook("fix-lifecycle-gate", () => createFixLifecycleGateHook(ctx))
+    ? safeHook("fix-lifecycle-gate", () =>
+        createFixLifecycleGateHook(ctx, {
+          repeatFixThreshold:
+            pluginConfig.cognitive_governance?.fix_lifecycle_gate?.repeat_fix_threshold,
+          sameFileFixThreshold:
+            pluginConfig.cognitive_governance?.fix_lifecycle_gate?.same_file_fix_threshold,
+          captureHardBlockThreshold:
+            pluginConfig.cognitive_governance?.fix_lifecycle_gate?.capture_hard_block_threshold,
+          executeActivityThreshold:
+            pluginConfig.cognitive_governance?.fix_lifecycle_gate?.execute_activity_threshold,
+          f3BlockThreshold:
+            pluginConfig.cognitive_governance?.fix_lifecycle_gate?.f3_block_threshold,
+          f2f4BlockThreshold:
+            pluginConfig.cognitive_governance?.fix_lifecycle_gate?.f2_f4_block_threshold,
+        }))
     : null
 
   const kgsSync = isHookEnabled("kgs-sync")
@@ -199,6 +259,10 @@ export function createToolGuardHooks(args: {
 
   const toolAbortRecovery = isHookEnabled("tool-abort-recovery")
     ? safeHook("tool-abort-recovery", () => createToolAbortRecoveryHook(ctx))
+    : null
+
+  const taskHealth = isHookEnabled("task-health")
+    ? safeHook("task-health", () => createTaskHealthHook(ctx))
     : null
 
   return {
@@ -228,5 +292,6 @@ export function createToolGuardHooks(args: {
     kgsSync,
     knowledgeProtection,
     toolAbortRecovery,
+    taskHealth,
   }
 }

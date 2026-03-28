@@ -2,8 +2,23 @@ import type { PluginInput } from "@opencode-ai/plugin"
 import type { PreFlightConfig } from "./types"
 import { DEFAULT_PRE_FLIGHT_CONFIG } from "./types"
 import { getSessionState, incrementRead, incrementPlan, markBlocked, resetCycle, deleteSession } from "./state"
+import { getSessionAgent } from "../../features/claude-code-session-state"
 import { isReadOnlyBashCommand } from "../../shared/bash-command-classifier"
+import { isSubagentSession } from "../../shared/task-ownership-policy"
+import {
+	getCognitiveReviewVerdict,
+	clearCognitiveReviewVerdict,
+} from "../cognitive-governance-shared/review-state"
+import {
+	buildCognitiveReviewBlockMessage,
+	shouldBlockByCognitiveReview,
+} from "./cognitive-review-gate"
 import { log } from "../../shared"
+import { runRuntimeGovernancePrecheck } from "../shared/governance-runtime-precheck"
+import { runGovernanceBootGate } from "../shared/governance-boot-gate"
+import {
+	clearGovernanceSessionValidation,
+} from "../shared/governance-session-state"
 
 const READ_TOOLS = new Set([
 	"read", "glob", "grep", "ast_grep_search",
@@ -30,6 +45,7 @@ export function createPreFlightGuardHook(
 	): Promise<void> => {
 		const { tool, sessionID } = input
 		const normalized = tool.toLowerCase()
+		let governanceBlockMessage: string | null = null
 
 		try {
 			const state = getSessionState(sessionID)
@@ -60,19 +76,55 @@ export function createPreFlightGuardHook(
 				}
 			}
 
-			if (state.readToolCount >= config.minReadBeforeExecute) return
+			const reviewVerdict = getCognitiveReviewVerdict(sessionID)
+			if (!governanceBlockMessage && shouldBlockByCognitiveReview(reviewVerdict)) {
+				governanceBlockMessage = buildCognitiveReviewBlockMessage(reviewVerdict)
+			}
 
-			if (state.firstExecuteBlocked) return
+			if (!isSubagentSession(sessionID)) {
+				const bootGate = await runGovernanceBootGate({
+					directory: _ctx.directory,
+					sessionID,
+				})
 
-			markBlocked(sessionID)
-			log("[pre-flight-guard] Execute without Read detected", {
-				sessionID,
-				tool,
-				readCount: state.readToolCount,
-			})
+				if (bootGate.status === "failed") {
+					governanceBlockMessage = bootGate.message ?? "[Governance Boot Gate] 启动阶段治理校验失败"
+				}
+			}
+
+			if (!isSubagentSession(sessionID) && !governanceBlockMessage) {
+				const runtimePrecheck = await runRuntimeGovernancePrecheck({
+					directory: _ctx.directory,
+					sessionID,
+					agent: getSessionAgent(sessionID),
+					tool: normalized,
+					args: _output.args,
+				})
+
+				if (runtimePrecheck.status === "failed") {
+					governanceBlockMessage = runtimePrecheck.message
+				}
+			}
+
+			if (!governanceBlockMessage) {
+				if (state.readToolCount >= config.minReadBeforeExecute) return
+
+				if (state.firstExecuteBlocked) return
+
+				markBlocked(sessionID)
+				log("[pre-flight-guard] Execute without Read detected", {
+					sessionID,
+					tool,
+					readCount: state.readToolCount,
+				})
+			}
 		} catch (e) {
 			log("[gaia-hook-safe] preFlightGuard before failed", { error: e })
 			return
+		}
+
+		if (governanceBlockMessage) {
+			throw new Error(governanceBlockMessage)
 		}
 
 		throw new Error(
@@ -94,11 +146,25 @@ export function createPreFlightGuardHook(
 	}
 
 	const event = async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {
+		if (event.type === "session.created") {
+			const props = event.properties as { info?: { id?: string } } | undefined
+			const sessionId = props?.info?.id
+			if (sessionId && !isSubagentSession(sessionId)) {
+				await runGovernanceBootGate({
+					directory: _ctx.directory,
+					sessionID: sessionId,
+				})
+			}
+			return
+		}
+
 		if (event.type !== "session.deleted") return
 		const props = event.properties as { info?: { id?: string } } | undefined
 		const sessionId = props?.info?.id
 		if (sessionId) {
 			deleteSession(sessionId)
+			clearCognitiveReviewVerdict(sessionId)
+			clearGovernanceSessionValidation(sessionId)
 		}
 	}
 

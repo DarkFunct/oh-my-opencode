@@ -1,8 +1,7 @@
 import type { SessionCognitiveState } from "../cognitive-governance-shared/types"
 import { isCaptureSettled } from "../cognitive-governance-shared/capture-cooldown"
-
-const CAPTURE_HARD_BLOCK_THRESHOLD = 4
-const EXECUTE_ACTIVITY_THRESHOLD = 3
+import type { FixLifecycleGateConfig } from "./config"
+import { DEFAULT_FIX_LIFECYCLE_GATE_CONFIG } from "./config"
 
 export interface CaptureVerdict {
 	shouldBlock: boolean
@@ -11,17 +10,20 @@ export interface CaptureVerdict {
 	editedFiles: number
 }
 
-export function detectCaptureViolation(state: SessionCognitiveState): CaptureVerdict {
+export function detectCaptureViolation(
+	state: SessionCognitiveState,
+	config: FixLifecycleGateConfig = DEFAULT_FIX_LIFECYCLE_GATE_CONFIG,
+): CaptureVerdict {
 	if (!state.executePhaseActive || isCaptureSettled(state)) {
 		return { shouldBlock: false, reason: "ok", roundsPending: 0, editedFiles: 0 }
 	}
 
 	const editedFiles = state.fileEditHistory.size
-	if (editedFiles < EXECUTE_ACTIVITY_THRESHOLD) {
+	if (editedFiles < config.executeActivityThreshold) {
 		return { shouldBlock: false, reason: "ok", roundsPending: 0, editedFiles }
 	}
 
-	if (state.roundsSinceCaptureNeeded >= CAPTURE_HARD_BLOCK_THRESHOLD) {
+	if (state.roundsSinceCaptureNeeded >= config.captureHardBlockThreshold) {
 		return {
 			shouldBlock: true,
 			reason: "capture_overdue",

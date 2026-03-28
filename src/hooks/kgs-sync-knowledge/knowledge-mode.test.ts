@@ -14,6 +14,7 @@ describe("knowledge-mode", () => {
     expect(resolveKnowledgeMode(env)).toBe("dual")
     const config = resolveKnowledgeRuntimeConfig({ env })
     expect(config.mode).toBe("dual")
+    expect(config.readSourceMode).toBe("hybrid")
     expect(config.readAugmentEnabled).toBe(true)
     expect(config.writeIngestEnabled).toBe(true)
     expect(config.outboxReplayEnabled).toBe(true)
@@ -26,6 +27,7 @@ describe("knowledge-mode", () => {
       },
     })
     expect(config.mode).toBe("markdown_only")
+    expect(config.readSourceMode).toBe("local_only")
     expect(config.writeIngestEnabled).toBe(false)
   })
 
@@ -37,6 +39,7 @@ describe("knowledge-mode", () => {
         KGS_KNOWLEDGE_OUTBOX_REPLAY: "0",
       },
     })
+    expect(config.readSourceMode).toBe("local_only")
     expect(config.readAugmentEnabled).toBe(false)
     expect(config.outboxReplayEnabled).toBe(false)
   })
@@ -56,8 +59,38 @@ describe("knowledge-mode", () => {
     })
 
     expect(config.mode).toBe("markdown_only")
+    expect(config.readSourceMode).toBe("hybrid")
     expect(config.readAugmentEnabled).toBe(true)
     expect(config.outboxReplayEnabled).toBe(true)
     expect(config.writeIngestEnabled).toBe(false)
+  })
+
+  it("supports explicit read source mode", () => {
+    const config = resolveKnowledgeRuntimeConfig({
+      env: {
+        KGS_KNOWLEDGE_MODE: "dual",
+      },
+      override: {
+        read_source_mode: "kgs_only",
+      },
+    })
+
+    expect(config.readSourceMode).toBe("kgs_only")
+    expect(config.readAugmentEnabled).toBe(true)
+  })
+
+  it("prioritizes read_source_mode over read_augment", () => {
+    const config = resolveKnowledgeRuntimeConfig({
+      env: {
+        KGS_KNOWLEDGE_MODE: "dual",
+      },
+      override: {
+        read_source_mode: "local_only",
+        read_augment: true,
+      },
+    })
+
+    expect(config.readSourceMode).toBe("local_only")
+    expect(config.readAugmentEnabled).toBe(false)
   })
 })

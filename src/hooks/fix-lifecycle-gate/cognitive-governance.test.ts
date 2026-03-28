@@ -6,6 +6,7 @@ import { detectRepeatFix, incrementConsecutiveFailure } from "./repeat-fix-detec
 import { detectCaptureViolation } from "./capture-gate"
 import { detectCognitiveFailureBlock } from "./failure-gate"
 import { detectCognitiveFailureWarn } from "../cognitive-governance/failure-directives"
+import { DEFAULT_FIX_LIFECYCLE_GATE_CONFIG } from "./config"
 
 describe("cognitive-governance-shared/state", () => {
 	test("creates default state on first access", () => {
@@ -76,6 +77,17 @@ describe("repeat-fix-detector", () => {
 		expect(verdict.shouldBlock).toBe(true)
 		expect(verdict.reason).toBe("consecutive_failures")
 		deleteCognitiveSession("test-repeat-2")
+	})
+
+	test("respects configurable repeat fix threshold", () => {
+		const state = getCognitiveState("test-repeat-config-1")
+		state.consecutiveFixFailures = 3
+		const verdict = detectRepeatFix(state, {
+			...DEFAULT_FIX_LIFECYCLE_GATE_CONFIG,
+			repeatFixThreshold: 4,
+		})
+		expect(verdict.shouldBlock).toBe(false)
+		deleteCognitiveSession("test-repeat-config-1")
 	})
 
 	test("blocks same file repeated edits with unresolved errors", () => {
@@ -154,6 +166,21 @@ describe("capture-gate", () => {
 		deleteCognitiveSession("test-capture-3")
 	})
 
+	test("respects configurable capture hard block threshold", () => {
+		const state = getCognitiveState("test-capture-config-1")
+		state.executePhaseActive = true
+		state.roundsSinceCaptureNeeded = 4
+		state.fileEditHistory.set("a.ts", { count: 1, lastEditTimestamp: Date.now(), tools: ["edit"] })
+		state.fileEditHistory.set("b.ts", { count: 1, lastEditTimestamp: Date.now(), tools: ["edit"] })
+		state.fileEditHistory.set("c.ts", { count: 1, lastEditTimestamp: Date.now(), tools: ["edit"] })
+		const verdict = detectCaptureViolation(state, {
+			...DEFAULT_FIX_LIFECYCLE_GATE_CONFIG,
+			captureHardBlockThreshold: 5,
+		})
+		expect(verdict.shouldBlock).toBe(false)
+		deleteCognitiveSession("test-capture-config-1")
+	})
+
 	test("no block when capture is settled", () => {
 		const state = getCognitiveState("test-capture-4")
 		state.executePhaseActive = true
@@ -223,6 +250,17 @@ describe("failure-gate (F1/F3/F5)", () => {
 		expect(failure!.directive).toContain("F3")
 		expect(failure!.directive).toContain("5")
 		deleteCognitiveSession("test-f3-2")
+	})
+
+	test("F3 threshold is configurable", () => {
+		const state = getCognitiveState("test-f3-config-1")
+		state.editsSinceLastVerification = 5
+		const failure = detectCognitiveFailureBlock(state, {
+			...DEFAULT_FIX_LIFECYCLE_GATE_CONFIG,
+			f3BlockThreshold: 6,
+		})
+		expect(failure).toBeNull()
+		deleteCognitiveSession("test-f3-config-1")
 	})
 
 	test("F3: blocks at higher edit counts", () => {

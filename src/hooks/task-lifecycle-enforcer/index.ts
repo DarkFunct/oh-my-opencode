@@ -11,9 +11,11 @@ import {
 	deleteSession,
 } from "./state"
 import { buildNoTaskCreatedReminder, buildCompactionCheckpoint, buildChatMessageTaskStatus } from "./prompts"
-import { extractTaskId, parseTaskOutput } from "./task-output-parser"
+import { extractTaskId, parseTaskError, parseTaskOutput } from "./task-output-parser"
 import { log } from "../../shared"
 import { isSubagentSession } from "../../shared/task-ownership-policy"
+import { syncTaskLeaseSignal } from "./lease-sync"
+import { extractSessionID } from "./session-id"
 
 type MessageWithParts = {
 	info: Message
@@ -29,7 +31,7 @@ const TASK_UPDATE_TOOLS = new Set(["task_update"])
 const MAX_STATUS_LENGTH = 400
 
 export function createTaskLifecycleEnforcerHook(
-	_ctx: PluginInput,
+	ctx: PluginInput,
 	configOverrides?: Partial<TaskLifecycleConfig>,
 ) {
 	const config: TaskLifecycleConfig = {
@@ -53,6 +55,12 @@ export function createTaskLifecycleEnforcerHook(
 			if (TASK_CREATE_TOOLS.has(normalized)) {
 				const taskId = extractTaskId(output.output)
 				markTaskCreated(sessionID, taskId)
+				await syncTaskLeaseSignal({
+					directory: ctx.directory,
+					sessionID,
+					action: "heartbeat",
+					taskId,
+				})
 				log("[task-lifecycle-enforcer] Task created", { sessionID, taskId })
 				return
 			}
@@ -61,9 +69,31 @@ export function createTaskLifecycleEnforcerHook(
 				const parsed = parseTaskOutput(output.output)
 				if (parsed.status === "completed") {
 					markTaskCompleted(sessionID, parsed.id)
+					await syncTaskLeaseSignal({
+						directory: ctx.directory,
+						sessionID,
+						action: "complete",
+						taskId: parsed.id,
+					})
 					log("[task-lifecycle-enforcer] Task completed", { sessionID, taskId: parsed.id })
 				} else if (parsed.status === "in_progress" && parsed.id) {
 					markTaskCreated(sessionID, parsed.id)
+					await syncTaskLeaseSignal({
+						directory: ctx.directory,
+						sessionID,
+						action: "heartbeat",
+						taskId: parsed.id,
+					})
+				} else {
+					const taskError = parseTaskError(output.output)
+					if (taskError) {
+						await syncTaskLeaseSignal({
+							directory: ctx.directory,
+							sessionID,
+							action: "nack",
+							reason: taskError.message ?? taskError.error,
+						})
+					}
 				}
 				return
 			}
@@ -164,12 +194,4 @@ export function createTaskLifecycleEnforcerHook(
 		"experimental.chat.messages.transform": messagesTransform,
 		event,
 	}
-}
-
-function extractSessionID(messages: MessageWithParts[]): string | undefined {
-	for (let i = messages.length - 1; i >= 0; i--) {
-		const sid = (messages[i].info as { sessionID?: string }).sessionID
-		if (sid) return sid
-	}
-	return undefined
 }

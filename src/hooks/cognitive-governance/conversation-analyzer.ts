@@ -1,5 +1,6 @@
 import type { SessionCognitiveState, CognitiveLayer, MethodologyDimension, DetectedError } from "../cognitive-governance-shared/types"
 import { isCaptureSettled } from "../cognitive-governance-shared/capture-cooldown"
+import { evaluateGaiaStageA } from "./gaia-stage-a-adapter"
 
 export interface CognitiveAssessment {
 	currentLayer: CognitiveLayer
@@ -11,6 +12,7 @@ export interface CognitiveAssessment {
 	readCount: number
 	grepCount: number
 	editedFilesCount: number
+	pendingVerificationEditsCount: number
 	hasVerification: boolean
 	captureNeeded: boolean
 	captureUrgency: "none" | "reminder" | "warning" | "critical"
@@ -21,18 +23,23 @@ const ALL_DIMENSIONS: MethodologyDimension[] = [
 ]
 
 export function assessCognition(state: SessionCognitiveState): CognitiveAssessment {
-	const covered = Array.from(state.dimensionsCovered)
-	const gap = ALL_DIMENSIONS.filter((d) => !state.dimensionsCovered.has(d))
+	const gaiaStageA = evaluateGaiaStageA(state)
+	const covered = gaiaStageA
+		? Array.from(new Set<MethodologyDimension>([...state.dimensionsCovered, ...gaiaStageA.dimensionsCovered]))
+		: Array.from(state.dimensionsCovered)
+	const coveredSet = new Set(covered)
+	const gap = ALL_DIMENSIONS.filter((d) => !coveredSet.has(d))
+	const hasPendingVerification = state.editsSinceLastVerification > 0
 
 	const hasVerification =
-		state.lastBuildResult === "success" ||
-		state.lastTestResult === "success"
+		!hasPendingVerification &&
+		(state.lastBuildResult === "success" || state.lastTestResult === "success")
 
 	const captureNeeded = state.executePhaseActive && !isCaptureSettled(state) && state.fileEditHistory.size >= 3
 	const captureUrgency = deriveCaptureUrgency(state, captureNeeded)
 
 	return {
-		currentLayer: state.currentLayer,
+		currentLayer: gaiaStageA?.layer ?? state.currentLayer,
 		dimensionsCovered: covered,
 		dimensionsGap: gap,
 		errorCount: state.detectedErrors.length,
@@ -41,6 +48,7 @@ export function assessCognition(state: SessionCognitiveState): CognitiveAssessme
 		readCount: state.readCount,
 		grepCount: state.grepCount,
 		editedFilesCount: state.fileEditHistory.size,
+		pendingVerificationEditsCount: state.editsSinceLastVerification,
 		hasVerification,
 		captureNeeded,
 		captureUrgency,
@@ -90,6 +98,11 @@ function isErrorLikelyResolved(
 }
 
 export function determineCognitiveLayer(state: SessionCognitiveState): CognitiveLayer {
+	const gaiaStageA = evaluateGaiaStageA(state)
+	if (gaiaStageA) {
+		return gaiaStageA.layer
+	}
+
 	if (state.readCount < 2) {
 		return "perception"
 	}
@@ -104,8 +117,8 @@ export function determineCognitiveLayer(state: SessionCognitiveState): Cognitive
 	}
 
 	const hasVerification =
-		state.lastBuildResult !== "unknown" ||
-		state.lastTestResult !== "unknown"
+		(state.lastBuildResult !== "unknown" || state.lastTestResult !== "unknown") &&
+		state.editsSinceLastVerification === 0
 
 	if (hasVerification) {
 		return "rationality"

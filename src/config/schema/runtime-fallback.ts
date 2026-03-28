@@ -1,5 +1,12 @@
 import { z } from "zod"
 
+const RuntimeFallbackLaddersSchema = z.object({
+  onRateLimit: z.array(z.string().min(1)).optional(),
+  onAuthError: z.array(z.string().min(1)).optional(),
+  onThinkingIncompatible: z.array(z.string().min(1)).optional(),
+  onModelUnavailable: z.array(z.string().min(1)).optional(),
+})
+
 export const RuntimeFallbackConfigSchema = z.object({
   /** Enable runtime fallback (default: false) */
   enabled: z.boolean().optional(),
@@ -13,6 +20,7 @@ export const RuntimeFallbackConfigSchema = z.object({
   timeout_seconds: z.number().min(0).optional(),
   /** Show toast notification when switching to fallback model (default: true) */
   notify_on_fallback: z.boolean().optional(),
+  ladders: RuntimeFallbackLaddersSchema.optional(),
 })
 
 export type RuntimeFallbackConfig = z.infer<typeof RuntimeFallbackConfigSchema>

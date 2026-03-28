@@ -2,12 +2,21 @@ import type { HookDeps } from "./types"
 import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
-import { extractStatusCode, extractErrorName, classifyErrorType, isRetryableError, extractAutoRetrySignal, containsErrorContent } from "./error-classifier"
+import {
+  extractStatusCode,
+  extractErrorName,
+  classifyErrorType,
+  isRetryableError,
+  extractAutoRetrySignal,
+  containsErrorContent,
+  getErrorMessage,
+} from "./error-classifier"
 import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { resolveFallbackBootstrapModel } from "./fallback-bootstrap-model"
 import { dispatchFallbackRetry } from "./fallback-retry-dispatcher"
 import { hasVisibleAssistantResponse } from "./visible-assistant-response"
+import { classifyRuntimeFallbackReason } from "./runtime-fallback-reason"
 
 export { hasVisibleAssistantResponse } from "./visible-assistant-response"
 
@@ -88,20 +97,26 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         helpers.clearSessionFallbackTimeout(sessionID)
       }
 
+      const statusCode = extractStatusCode(error, config.retry_on_errors)
+      const errorName = extractErrorName(error)
+      const errorType = classifyErrorType(error)
+      const fallbackReason = classifyRuntimeFallbackReason(error, config.retry_on_errors)
+
       log(`[${HOOK_NAME}] message.updated with assistant error`, {
         sessionID,
         model,
-        statusCode: extractStatusCode(error, config.retry_on_errors),
-        errorName: extractErrorName(error),
-        errorType: classifyErrorType(error),
+        statusCode,
+        errorName,
+        errorType,
+        fallbackReason,
       })
 
       if (!isRetryableError(error, config.retry_on_errors)) {
         log(`[${HOOK_NAME}] message.updated error not retryable, skipping fallback`, {
           sessionID,
-          statusCode: extractStatusCode(error, config.retry_on_errors),
-          errorName: extractErrorName(error),
-          errorType: classifyErrorType(error),
+          statusCode,
+          errorName,
+          errorType,
         })
         return
       }
@@ -109,7 +124,12 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
       let state = sessionStates.get(sessionID)
       const agent = info?.agent as string | undefined
       const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
-      const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
+      const fallbackModels = getFallbackModelsForSession(
+        sessionID,
+        resolvedAgent,
+        pluginConfig,
+        fallbackReason,
+      )
 
       if (fallbackModels.length === 0) {
         return
@@ -162,6 +182,10 @@ export function createMessageUpdateHandler(deps: HookDeps, helpers: AutoRetryHel
         fallbackModels,
         resolvedAgent,
         source: "message.updated",
+        reason: fallbackReason,
+        statusCode,
+        errorName,
+        errorMessage: getErrorMessage(error),
       })
     }
   }

@@ -1,11 +1,11 @@
 import type { SessionCognitiveState, CognitiveFailure } from "../cognitive-governance-shared/types"
 import { computeErrorTraceDepth, computeFixTargetConsistency, isSameDirectionRetry } from "../session-evidence-collector/failure-signals"
-
-const F3_BLOCK_THRESHOLD = 5
-const F2_F4_BLOCK_THRESHOLD = 3
+import type { FixLifecycleGateConfig } from "./config"
+import { DEFAULT_FIX_LIFECYCLE_GATE_CONFIG } from "./config"
 
 export function detectCognitiveFailureBlock(
 	state: SessionCognitiveState,
+	config: FixLifecycleGateConfig = DEFAULT_FIX_LIFECYCLE_GATE_CONFIG,
 ): CognitiveFailure | null {
 	// F1: Blind Execution — errors detected but source files not read
 	if (state.detectedErrors.length > 0 && state.executePhaseActive) {
@@ -26,7 +26,7 @@ export function detectCognitiveFailureBlock(
 
 	// F3: Unverified Changes — too many edits without running verification
 	// Progressive: warn at ≥4 (L3 failure-directives.ts), block at ≥5 (here)
-	if (state.editsSinceLastVerification >= F3_BLOCK_THRESHOLD) {
+	if (state.editsSinceLastVerification >= config.f3BlockThreshold) {
 		return {
 			id: "F3",
 			name: "Unverified Changes",
@@ -46,7 +46,7 @@ export function detectCognitiveFailureBlock(
 	}
 
 	// F2: Fix Direction Mismatch — repeated failures with zero overlap between error source and edit targets
-	if (state.consecutiveFixFailures >= F2_F4_BLOCK_THRESHOLD) {
+	if (state.consecutiveFixFailures >= config.f2f4BlockThreshold) {
 		const consistency = computeFixTargetConsistency(state)
 		if (consistency === 0 && state.detectedErrors.length > 0 && state.fileEditHistory.size > 0) {
 			const errorFiles = state.detectedErrors
@@ -56,14 +56,14 @@ export function detectCognitiveFailureBlock(
 				id: "F2",
 				name: "Fix Direction Mismatch",
 				action: "block",
-				directive: buildF2BlockDirective([...new Set(errorFiles)]),
+				directive: buildF2BlockDirective([...new Set(errorFiles)], config.f2f4BlockThreshold),
 			}
 		}
 	}
 
 	// F4: Knowledge Blindspot — repeated failures without consulting knowledge base
 	if (
-		state.consecutiveFixFailures >= F2_F4_BLOCK_THRESHOLD &&
+		state.consecutiveFixFailures >= config.f2f4BlockThreshold &&
 		!state.knowledgeReadSinceLastFailure &&
 		state.newFilesReadSinceLastFailure === 0
 	) {
@@ -101,10 +101,10 @@ function buildF3Directive(editCount: number): string {
 	)
 }
 
-function buildF2BlockDirective(errorSourceFiles: string[]): string {
+function buildF2BlockDirective(errorSourceFiles: string[], threshold: number): string {
 	const fileList = errorSourceFiles.slice(0, 5).join(", ")
 	return (
-		`[🛑 F2: 修复方向偏离] 连续 ${F2_F4_BLOCK_THRESHOLD} 次失败且编辑目标与错误源零重叠。` +
+		`[🛑 F2: 修复方向偏离] 连续 ${threshold} 次失败且编辑目标与错误源零重叠。` +
 		`错误涉及: ${fileList}。请 read 错误源文件重新定位根因。`
 	)
 }

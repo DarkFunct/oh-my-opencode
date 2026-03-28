@@ -20,6 +20,7 @@ export interface BoulderState {
   worktree_path?: string
   /** Preferred reusable subagent sessions keyed by current top-level plan task */
   task_sessions?: Record<string, TaskSessionState>
+  governance_lease_task_id?: string
 }
 
 export interface PlanProgress {

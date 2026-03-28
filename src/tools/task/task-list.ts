@@ -5,6 +5,7 @@ import type { OhMyOpenCodeConfig } from "../../config/schema"
 import type { TaskObject, TaskStatus } from "./types"
 import { TaskObjectSchema } from "./types"
 import { readJsonSafe, getTaskDir } from "../../features/claude-tasks/storage"
+import { buildDispatchSummary } from "./task-dispatch-graph"
 
 interface TaskSummary {
   id: string
@@ -72,6 +73,7 @@ Returns summary format: id, subject, status, owner, blockedBy (not full descript
 
        return JSON.stringify({
          tasks: summaries,
+         dispatch: buildDispatchSummary(summaries.map((task) => ({ id: task.id, blockedBy: task.blockedBy }))),
          reminder: "1 task = 1 task. Maximize parallel execution by running independent tasks (tasks with empty blockedBy) concurrently."
        })
     },

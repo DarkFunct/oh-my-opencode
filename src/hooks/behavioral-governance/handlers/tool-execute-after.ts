@@ -22,11 +22,9 @@ const COGNITIVE_MARKERS = [
 	/─── D5:.*Impact/i,
 ]
 
-const COGNITIVE_MARKERS_THRESHOLD = 3
-
-function detectCognitiveAnalysis(output: string): boolean {
+function detectCognitiveAnalysis(output: string, threshold: number): boolean {
 	const matches = COGNITIVE_MARKERS.filter((p) => p.test(output)).length
-	return matches >= COGNITIVE_MARKERS_THRESHOLD
+	return matches >= threshold
 }
 
 function detectAuthorizationResponse(output: string): string | null {
@@ -70,7 +68,7 @@ export function createToolExecuteAfterHandler(config: GovernanceConfig) {
 				consumeOnceAuthorization(input.sessionID)
 			}
 
-			if (!state.cognitiveAnalysisCompleted && detectCognitiveAnalysis(safeOutput)) {
+			if (!state.cognitiveAnalysisCompleted && detectCognitiveAnalysis(safeOutput, config.cognitiveMarkersThreshold)) {
 				markCognitiveAnalysisComplete(input.sessionID)
 				log("[behavioral-governance] Cognitive analysis detected — gate opened", {
 					sessionID: input.sessionID,

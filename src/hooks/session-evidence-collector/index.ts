@@ -8,13 +8,22 @@ import { fuseConfidence } from "./confidence-fusion"
 import { detectResetTriggers } from "./reset-triggers"
 import { executeResets } from "./reset-executor"
 import { trackFileEdit, trackReadFile, trackBuildResult, trackTestResult } from "./edit-tracker"
+import {
+	evaluateCaptureDocumentationMaintenance,
+	type DocumentationAutoManagementConfig,
+} from "./capture-doc-maintenance"
 import { isReadTool, isGrepTool, isExecuteTool, isCaptureTarget, detectMethodologyDimension, isVerifiableFile } from "./evidence-signals"
 import { scoreAllEvidences } from "../context-relevance-scorer"
 import { log } from "../../shared"
 
-const WRITE_TOOLS = new Set(["edit", "write", "ast_grep_replace", "lsp_rename"])
+const WRITE_TOOLS = new Set(["edit", "write", "ast_grep_replace", "lsp_rename", "apply_patch"])
 
-export function createSessionEvidenceCollectorHook(_ctx: PluginInput) {
+export function createSessionEvidenceCollectorHook(
+	ctx: PluginInput,
+	configOverrides?: Partial<DocumentationAutoManagementConfig>,
+) {
+	const projectRoot = typeof ctx.directory === "string" ? ctx.directory : process.cwd()
+
 	const toolExecuteBefore = async (
 		input: { tool: string; sessionID: string; callID: string },
 		output: { args: Record<string, unknown> },
@@ -24,6 +33,12 @@ export function createSessionEvidenceCollectorHook(_ctx: PluginInput) {
 			const normalized = tool.toLowerCase()
 			const state = getCognitiveState(sessionID)
 			const filePath = extractFilePath(normalized, output.args)
+			const commandText =
+				typeof output.args.command === "string"
+					? output.args.command
+					: typeof output.args.patchText === "string"
+						? output.args.patchText
+						: undefined
 
 			state.toolSequence.push({
 				tool: normalized,
@@ -36,13 +51,10 @@ export function createSessionEvidenceCollectorHook(_ctx: PluginInput) {
 					trackReadFile(state, filePath)
 					state.newFilesReadSinceLastFailure++
 				}
-				if (normalized === "lsp_diagnostics") {
-					state.editsSinceLastVerification = 0
-				}
 			}
 
 			if (WRITE_TOOLS.has(normalized)) {
-				if (!filePath || isVerifiableFile(filePath)) {
+				if (filePath && isVerifiableFile(filePath)) {
 					state.editsSinceLastVerification++
 				}
 			}
@@ -51,7 +63,7 @@ export function createSessionEvidenceCollectorHook(_ctx: PluginInput) {
 				state.grepCount++
 			}
 
-			detectMethodologyDimension(state, normalized, filePath)
+			detectMethodologyDimension(state, normalized, filePath, commandText)
 		} catch (e) {
 			log("[gaia-hook-safe] sessionEvidenceCollector before failed", { error: e })
 		}
@@ -76,20 +88,49 @@ export function createSessionEvidenceCollectorHook(_ctx: PluginInput) {
 				state.citationMap.set(filePath, (state.citationMap.get(filePath) ?? 0) + 1)
 			}
 
-			if (WRITE_TOOLS.has(normalized) && filePath) {
-				trackFileEdit(state, filePath, normalized)
-				state.executePhaseActive = true
-				if (isCaptureTarget(filePath)) {
-					recordCaptureWrite(state, filePath)
+			if (WRITE_TOOLS.has(normalized)) {
+				const effectiveFilePath = filePath ?? (normalized === "apply_patch" ? "__apply_patch__" : undefined)
+				if (effectiveFilePath) {
+					trackFileEdit(state, effectiveFilePath, normalized)
+					if (isCaptureTarget(effectiveFilePath)) {
+						recordCaptureWrite(state, effectiveFilePath)
+						if (effectiveFilePath !== "__apply_patch__" && effectiveFilePath !== "_meta/knowledge/unknown") {
+							evaluateCaptureDocumentationMaintenance({
+								projectRoot,
+								captureFilePath: effectiveFilePath,
+								editedFiles: state.fileEditHistory.keys(),
+								config: configOverrides,
+							})
+								.then((notice) => {
+									if (notice && output) {
+										output.output = (output.output ?? "") + "\n\n" + notice
+									}
+								})
+								.catch((err) => {
+									log("[gaia-hook-safe] capture-doc-maintenance failed", { error: err })
+								})
+						}
+					}
 				}
+				if (!filePath && normalized === "apply_patch") {
+					const hasCaptureSignal = /_meta\/knowledge\/|lessons-learned|pitfalls|constraints|decisions|\.sisyphus\/checkpoints\//i.test(safeOutput)
+					if (hasCaptureSignal) {
+						recordCaptureWrite(state, "_meta/knowledge/unknown")
+					}
+				}
+				state.executePhaseActive = true
 			}
 
 			if (isExecuteTool(normalized)) {
-				trackBuildResult(state, safeOutput)
-				trackTestResult(state, safeOutput)
-				if (state.lastBuildResult === "success" || state.lastTestResult === "success") {
+				const buildSignal = trackBuildResult(state, safeOutput)
+				const testSignal = trackTestResult(state, safeOutput)
+				if (buildSignal === "success" || testSignal === "success") {
 					state.editsSinceLastVerification = 0
 				}
+			}
+
+			if (normalized === "lsp_diagnostics" && hasCleanDiagnostics(safeOutput)) {
+				state.editsSinceLastVerification = 0
 			}
 
 			const source = classifySource(normalized)
@@ -147,4 +188,10 @@ export function createSessionEvidenceCollectorHook(_ctx: PluginInput) {
 		"tool.execute.after": toolExecuteAfter,
 		event,
 	}
+}
+
+function hasCleanDiagnostics(output: string): boolean {
+	if (/no diagnostics found|0 errors?/i.test(output)) return true
+	if (/files with errors:\s*0/i.test(output)) return true
+	return false
 }

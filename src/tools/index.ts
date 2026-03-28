@@ -42,6 +42,8 @@ export {
   createTaskGetTool,
   createTaskList,
   createTaskUpdateTool,
+  createTaskHealthTool,
+  createTaskReconcileTool,
 } from "./task"
 export { createHashlineEditTool } from "./hashline-edit"
 export { createKGSQueryTool } from "./kgs-query"

@@ -4,9 +4,15 @@ import { log } from "../../shared"
 
 const CHAIN_AUDIT_WARNING_PREFIX = "\n\n[⚠️ 方法论链信号审计]"
 
-const EXEMPT_AGENTS = new Set(["explore", "librarian", "oracle", "metis", "momus"])
+export interface MethodologyChainAuditConfig {
+  minOutputLengthForAudit: number
+  exemptAgents: string[]
+}
 
-const MIN_OUTPUT_LENGTH_FOR_AUDIT = 100
+export const DEFAULT_METHODOLOGY_CHAIN_AUDIT_CONFIG: MethodologyChainAuditConfig = {
+  minOutputLengthForAudit: 100,
+  exemptAgents: ["explore", "librarian", "oracle", "metis", "momus"],
+}
 
 function getAgentFromMetadata(metadata: Record<string, unknown> | undefined): string | undefined {
   if (!metadata) return undefined
@@ -14,7 +20,16 @@ function getAgentFromMetadata(metadata: Record<string, unknown> | undefined): st
   return typeof agent === "string" ? agent.toLowerCase() : undefined
 }
 
-export function createMethodologyChainAuditHook(_ctx: PluginInput) {
+export function createMethodologyChainAuditHook(
+  _ctx: PluginInput,
+  configOverrides?: Partial<MethodologyChainAuditConfig>,
+) {
+  const config: MethodologyChainAuditConfig = {
+    ...DEFAULT_METHODOLOGY_CHAIN_AUDIT_CONFIG,
+    ...configOverrides,
+  }
+  const exemptAgents = new Set(config.exemptAgents.map((agent) => agent.toLowerCase()))
+
   return {
     "tool.execute.after": async (
       input: { tool: string; sessionID: string; callID: string },
@@ -31,10 +46,10 @@ export function createMethodologyChainAuditHook(_ctx: PluginInput) {
         }
 
         const responseText = (output.output ?? "").trim()
-        if (responseText.length < MIN_OUTPUT_LENGTH_FOR_AUDIT) return
+        if (responseText.length < config.minOutputLengthForAudit) return
 
         const agent = getAgentFromMetadata(output.metadata)
-        if (agent && EXEMPT_AGENTS.has(agent)) {
+        if (agent && exemptAgents.has(agent)) {
           log("[methodology-chain-audit] Exempt agent, skipping", { agent })
           return
         }

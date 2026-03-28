@@ -3,6 +3,8 @@ import type { HookDeps, FallbackState } from "./types"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { prepareFallback } from "./fallback-state"
+import type { GovernanceRuntimeFallbackReason } from "../shared/governance-runtime-fallback-types"
+import { markGovernanceRuntimeFallbackState } from "../shared/governance-session-state"
 
 type DispatchFallbackRetryOptions = {
   sessionID: string
@@ -10,6 +12,10 @@ type DispatchFallbackRetryOptions = {
   fallbackModels: string[]
   resolvedAgent?: string
   source: string
+  reason?: GovernanceRuntimeFallbackReason
+  statusCode?: number
+  errorName?: string
+  errorMessage?: string
 }
 
 export async function dispatchFallbackRetry(
@@ -35,6 +41,18 @@ export async function dispatchFallbackRetry(
         },
       })
       .catch(() => {})
+  }
+
+  if (options.reason) {
+    markGovernanceRuntimeFallbackState(options.sessionID, {
+      reason: options.reason,
+      source: options.source,
+      updatedAt: Date.now(),
+      selectedFallbackModel: result.success ? result.newModel : undefined,
+      statusCode: options.statusCode,
+      errorName: options.errorName,
+      errorMessage: options.errorMessage,
+    })
   }
 
   if (result.success && result.newModel) {

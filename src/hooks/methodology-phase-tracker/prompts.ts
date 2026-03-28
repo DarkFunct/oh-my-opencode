@@ -22,6 +22,7 @@ export function buildCaptureReminder(state: MethodologySessionState): string {
 		"方法论链要求在 Execute 后进入 Capture 阶段：",
 		"- 产出知识沉淀（更新 _meta/knowledge/ 或声明无新增沉淀）",
 		"- 如有新发现的约束/陷阱/决策，写入对应文档",
+		"- 按格式沉淀：经验(L-xxx) / 陷阱(P-xxx) / 决策(D-xxx) / 约束(C-xxx)",
 		"- 如确认无新增知识，显式声明：「Capture: 无新增知识沉淀」",
 	].join("\n")
 }

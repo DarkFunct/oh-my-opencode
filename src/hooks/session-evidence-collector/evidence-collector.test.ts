@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { getCognitiveState, deleteCognitiveSession } from "../cognitive-governance-shared/state"
-import { isReadTool, isGrepTool, isExecuteTool, isCaptureTarget, detectMethodologyDimension } from "./evidence-signals"
+import { isReadTool, isGrepTool, isExecuteTool, isCaptureTarget, detectMethodologyDimension, isVerifiableFile } from "./evidence-signals"
 import { computeErrorTraceDepth, computeFixTargetConsistency, hasReadKnowledgeFiles, isSameDirectionRetry } from "./failure-signals"
 import { isFixAttempt } from "./text-matcher"
 
@@ -38,12 +38,35 @@ describe("evidence-signals", () => {
 		expect(isCaptureTarget("src/hooks/index.ts")).toBe(false)
 	})
 
+	test("isVerifiableFile handles docs/config exceptions correctly", () => {
+		expect(isVerifiableFile("_meta/knowledge/lessons-learned.md")).toBe(false)
+		expect(isVerifiableFile("tsconfig.json")).toBe(true)
+		expect(isVerifiableFile("configs/package.json")).toBe(true)
+		expect(isVerifiableFile("bunfig.toml")).toBe(true)
+	})
+
 	test("detectMethodologyDimension — technical for bash", () => {
 		const state = getCognitiveState("test-dim-1")
 		const dim = detectMethodologyDimension(state, "bash")
 		expect(dim).toBe("technical")
 		expect(state.dimensionsCovered.has("technical")).toBe(true)
 		deleteCognitiveSession("test-dim-1")
+	})
+
+	test("detectMethodologyDimension — empirical for bash test command", () => {
+		const state = getCognitiveState("test-dim-1b")
+		const dim = detectMethodologyDimension(state, "bash", undefined, "bun test src/foo.test.ts")
+		expect(dim).toBe("empirical")
+		expect(state.dimensionsCovered.has("empirical")).toBe(true)
+		deleteCognitiveSession("test-dim-1b")
+	})
+
+	test("detectMethodologyDimension — engineering for bash build command", () => {
+		const state = getCognitiveState("test-dim-1c")
+		const dim = detectMethodologyDimension(state, "bash", undefined, "bun run build")
+		expect(dim).toBe("engineering")
+		expect(state.dimensionsCovered.has("engineering")).toBe(true)
+		deleteCognitiveSession("test-dim-1c")
 	})
 
 	test("detectMethodologyDimension — engineering for tsconfig", () => {

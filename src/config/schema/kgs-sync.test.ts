@@ -17,8 +17,16 @@ describe("kgs_sync schema", () => {
       kgs_sync: {
         knowledge: {
           mode: "markdown_only",
+          read_source_mode: "hybrid",
           read_augment: false,
           outbox_replay: true,
+        },
+        task_maintenance_safety: {
+          max_reconcile_per_run: 40,
+          max_failures_per_run: 5,
+          orphan_grace_ms: 240000,
+          max_invalid_file_removals_per_run: 20,
+          min_invalid_file_age_ms: 600000,
         },
       },
     }
@@ -28,8 +36,14 @@ describe("kgs_sync schema", () => {
     expect(result.success).toBe(true)
     if (result.success) {
       expect(result.data.kgs_sync?.knowledge?.mode).toBe("markdown_only")
+      expect(result.data.kgs_sync?.knowledge?.read_source_mode).toBe("hybrid")
       expect(result.data.kgs_sync?.knowledge?.read_augment).toBe(false)
       expect(result.data.kgs_sync?.knowledge?.outbox_replay).toBe(true)
+      expect(result.data.kgs_sync?.task_maintenance_safety?.max_reconcile_per_run).toBe(40)
+      expect(result.data.kgs_sync?.task_maintenance_safety?.max_failures_per_run).toBe(5)
+      expect(result.data.kgs_sync?.task_maintenance_safety?.orphan_grace_ms).toBe(240000)
+      expect(result.data.kgs_sync?.task_maintenance_safety?.max_invalid_file_removals_per_run).toBe(20)
+      expect(result.data.kgs_sync?.task_maintenance_safety?.min_invalid_file_age_ms).toBe(600000)
     }
   })
 
@@ -38,6 +52,19 @@ describe("kgs_sync schema", () => {
       kgs_sync: {
         knowledge: {
           mode: "invalid",
+        },
+      },
+    }
+
+    const result = OhMyOpenCodeConfigSchema.safeParse(input)
+    expect(result.success).toBe(false)
+  })
+
+  test("rejects invalid read source mode", () => {
+    const input = {
+      kgs_sync: {
+        knowledge: {
+          read_source_mode: "invalid",
         },
       },
     }

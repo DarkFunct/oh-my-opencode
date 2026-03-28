@@ -63,6 +63,7 @@ export class KnowledgeGraphOrchestrator {
 
     this.logger(`${KNOWLEDGE_LOG_PREFIX} runtime config`, {
       mode: this.runtimeConfig.mode,
+      readSourceMode: this.runtimeConfig.readSourceMode,
       readAugmentEnabled: this.runtimeConfig.readAugmentEnabled,
       writeIngestEnabled: this.runtimeConfig.writeIngestEnabled,
       outboxReplayEnabled: this.runtimeConfig.outboxReplayEnabled,
@@ -82,7 +83,7 @@ export class KnowledgeGraphOrchestrator {
   }
 
   async augmentReadOutput(documentPath: string, toolOutput: string): Promise<string> {
-    if (!this.runtimeConfig.readAugmentEnabled) {
+    if (this.runtimeConfig.readSourceMode === "local_only") {
       return toolOutput
     }
     const readText = extractReadText(toolOutput)
@@ -100,11 +101,17 @@ export class KnowledgeGraphOrchestrator {
         matchedEntities: response.matchedEntities.length,
         relationships: response.summary.totalRelationships,
         warnings: response.warnings.length,
+        readSourceMode: this.runtimeConfig.readSourceMode,
       })
-      return `${toolOutput}\n\n${formatKnowledgeContextBlock(response)}`
+      const contextBlock = formatKnowledgeContextBlock(response)
+      if (this.runtimeConfig.readSourceMode === "kgs_only") {
+        return contextBlock
+      }
+      return `${toolOutput}\n\n${contextBlock}`
     } catch (error: unknown) {
       this.logger(`${KNOWLEDGE_LOG_PREFIX} read augmentation failed`, {
         documentPath,
+        readSourceMode: this.runtimeConfig.readSourceMode,
         error: error instanceof Error ? error.message : String(error),
       })
       return toolOutput

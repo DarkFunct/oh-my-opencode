@@ -21,4 +21,5 @@ export type {
   RuntimeFallbackConfig,
   FallbackModels,
   KGSSyncConfig,
+  CognitiveGovernanceConfig,
 } from "./schema"

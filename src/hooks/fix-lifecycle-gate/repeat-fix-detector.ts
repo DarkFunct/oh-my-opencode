@@ -1,7 +1,6 @@
 import type { SessionCognitiveState } from "../cognitive-governance-shared/types"
-
-const REPEAT_FIX_THRESHOLD = 3
-const SAME_FILE_FIX_THRESHOLD = 2
+import type { FixLifecycleGateConfig } from "./config"
+import { DEFAULT_FIX_LIFECYCLE_GATE_CONFIG } from "./config"
 
 export interface RepeatFixVerdict {
 	shouldBlock: boolean
@@ -10,8 +9,11 @@ export interface RepeatFixVerdict {
 	target: string | null
 }
 
-export function detectRepeatFix(state: SessionCognitiveState): RepeatFixVerdict {
-	if (state.consecutiveFixFailures >= REPEAT_FIX_THRESHOLD) {
+export function detectRepeatFix(
+	state: SessionCognitiveState,
+	config: FixLifecycleGateConfig = DEFAULT_FIX_LIFECYCLE_GATE_CONFIG,
+): RepeatFixVerdict {
+	if (state.consecutiveFixFailures >= config.repeatFixThreshold) {
 		return {
 			shouldBlock: true,
 			reason: "consecutive_failures",
@@ -22,7 +24,7 @@ export function detectRepeatFix(state: SessionCognitiveState): RepeatFixVerdict 
 
 	if (state.lastFixTarget) {
 		const editEntry = state.fileEditHistory.get(state.lastFixTarget)
-		if (editEntry && editEntry.count >= SAME_FILE_FIX_THRESHOLD) {
+		if (editEntry && editEntry.count >= config.sameFileFixThreshold) {
 			const hasUnresolvedErrors = state.detectedErrors.some(
 				(e) => e.filePath === state.lastFixTarget,
 			)

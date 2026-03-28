@@ -4,6 +4,7 @@ import {
   syncTaskToTodo,
   syncAllTasksToTodos,
   syncTaskTodoUpdate,
+  TODO_SYNC_VISIBILITY_TIMEOUT_MS,
   type TodoInfo,
 } from "./todo-sync";
 
@@ -241,10 +242,11 @@ describe("syncTaskTodoUpdate", () => {
     };
 
     // when
-    await syncTaskTodoUpdate(mockCtx, task, "session-1", writer);
+    const result = await syncTaskTodoUpdate(mockCtx, task, "session-1", writer);
 
     // then
     expect(called).toBe(true);
+    expect(result.status).toBe("synced");
   });
 
   it("removes deleted task from todos", async () => {
@@ -275,10 +277,60 @@ describe("syncTaskTodoUpdate", () => {
     };
 
     // when
-    await syncTaskTodoUpdate(mockCtx, task, "session-1", writer);
+    const result = await syncTaskTodoUpdate(mockCtx, task, "session-1", writer);
 
     // then
     expect(called).toBe(true);
+    expect(result.status).toBe("synced");
+  });
+
+  it("returns failed status when todo sync throws", async () => {
+    // given
+    const task: Task = {
+      id: "T-fail",
+      subject: "Failing todo sync",
+      description: "",
+      status: "pending",
+      blocks: [],
+      blockedBy: [],
+    };
+    mockCtx.client.session.todo.mockRejectedValue(new Error("todo-api-down"));
+
+    // when
+    const result = await syncTaskTodoUpdate(mockCtx, task, "session-1");
+
+    // then
+    expect(result.status).toBe("failed");
+    expect(result.reason).toContain("todo-api-down");
+    expect(typeof result.visibleWithinMs).toBe("number");
+    expect(result.timeoutMs).toBe(TODO_SYNC_VISIBILITY_TIMEOUT_MS);
+  });
+
+  it("returns timeout failure within visibility SLA when todo fetch hangs", async () => {
+    const task: Task = {
+      id: "T-timeout",
+      subject: "Timeout task",
+      description: "",
+      status: "pending",
+      blocks: [],
+      blockedBy: [],
+    };
+    mockCtx.client.session.todo.mockImplementation(() => new Promise(() => {}));
+
+    const result = await syncTaskTodoUpdate(
+      mockCtx,
+      task,
+      "session-1",
+      undefined,
+      { visibilityTimeoutMs: 20 },
+    );
+
+    expect(result.status).toBe("failed");
+    expect(result.reason).toContain("todo_fetch_timeout_20ms");
+    expect(typeof result.visibleWithinMs).toBe("number");
+    expect(result.visibleWithinMs).toBeGreaterThanOrEqual(20);
+    expect(result.visibleWithinMs).toBeLessThan(500);
+    expect(result.timeoutMs).toBe(20);
   });
 });
 
@@ -364,7 +416,7 @@ describe("syncAllTasksToTodos", () => {
     const result = await syncAllTasksToTodos(mockCtx, tasks, "session-1");
 
     // then
-    expect(result).toBeUndefined();
+    expect(result.status).toBe("synced");
   });
 
   it("converts multiple tasks to todos", async () => {

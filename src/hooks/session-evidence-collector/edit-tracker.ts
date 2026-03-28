@@ -1,5 +1,7 @@
 import type { SessionCognitiveState } from "../cognitive-governance-shared/types"
 
+export type VerificationSignal = "success" | "fail" | "unknown"
+
 export function trackFileEdit(
 	state: SessionCognitiveState,
 	filePath: string,
@@ -32,22 +34,58 @@ export function trackReadFile(
 export function trackBuildResult(
 	state: SessionCognitiveState,
 	output: string,
-): void {
-	if (/exit code 0/i.test(output) || /compiled?\s+successfully/i.test(output) || /build\s+complete/i.test(output)) {
+): VerificationSignal {
+	if (
+		/exit code [1-9]/i.test(output) ||
+		/(?:compilation|type)\s+error/i.test(output) ||
+		/tsc.*error\s+TS/i.test(output) ||
+		/error\s+TS\d+/i.test(output)
+	) {
+		state.lastBuildResult = "fail"
+		return "fail"
+	}
+
+	if (
+		/exit code 0/i.test(output) ||
+		/compiled?\s+successfully/i.test(output) ||
+		/build\s+complete/i.test(output) ||
+		/\bBundled\s+\d+\s+modules?\b/i.test(output) ||
+		/\$\s*tsc\s+--noEmit/i.test(output)
+	) {
 		state.lastBuildResult = "success"
 		state.consecutiveFixFailures = 0
-	} else if (/exit code [1-9]/i.test(output) || /(?:compilation|type)\s+error/i.test(output) || /tsc.*error\s+TS/i.test(output)) {
-		state.lastBuildResult = "fail"
+		return "success"
 	}
+
+	return "unknown"
 }
 
 export function trackTestResult(
 	state: SessionCognitiveState,
 	output: string,
-): void {
-	if (/tests?\s+passed|all\s+pass/i.test(output)) {
-		state.lastTestResult = "success"
-	} else if (/tests?\s+failed|failure/i.test(output)) {
-		state.lastTestResult = "fail"
+): VerificationSignal {
+	const failCount = extractCount(output, /\b(\d+)\s+fail(?:ed|ures?)?\b/i)
+	if (typeof failCount === "number") {
+		state.lastTestResult = failCount === 0 ? "success" : "fail"
+		return state.lastTestResult
 	}
+
+	if (/tests?\s+failed|failed\s+tests?|\bfailure\b/i.test(output)) {
+		state.lastTestResult = "fail"
+		return "fail"
+	}
+
+	if (/tests?\s+passed|all\s+pass|\b\d+\s+pass(?:ed)?\b/i.test(output)) {
+		state.lastTestResult = "success"
+		return "success"
+	}
+
+	return "unknown"
+}
+
+function extractCount(output: string, pattern: RegExp): number | undefined {
+	const match = output.match(pattern)
+	if (!match) return undefined
+	const value = Number.parseInt(match[1], 10)
+	return Number.isNaN(value) ? undefined : value
 }

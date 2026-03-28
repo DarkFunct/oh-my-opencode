@@ -14,6 +14,18 @@ describe("structural-signals", () => {
 		test("returns undefined for bash", () => {
 			expect(extractFilePath("bash", { command: "ls" })).toBeUndefined()
 		})
+
+		test("extracts first file path from apply_patch patchText", () => {
+			const patchText = [
+				"*** Begin Patch",
+				"*** Update File: src/foo.ts",
+				"@@",
+				"-old",
+				"+new",
+				"*** End Patch",
+			].join("\n")
+			expect(extractFilePath("apply_patch", { patchText })).toBe("src/foo.ts")
+		})
 	})
 
 	describe("shell_command signals", () => {

@@ -14,11 +14,7 @@ const PLAN_TOOLS = new Set([
 
 const EXECUTE_TOOLS = new Set([
 	"edit", "write", "bash", "interactive_bash",
-	"lsp_rename", "ast_grep_replace",
-])
-
-const CAPTURE_TOOLS = new Set([
-	"task_update",
+	"lsp_rename", "ast_grep_replace", "apply_patch",
 ])
 
 export function classifyToolPhase(toolName: string): MethodologyPhase | null {
@@ -63,4 +59,44 @@ export function isCaptureSignalPresent(output: string): boolean {
 	]
 
 	return capturePatterns.some(p => p.test(output))
+}
+
+const CAPTURE_PATH_PATTERNS = [
+	/_meta\/knowledge\//i,
+	/lessons-learned\.(md|json)/i,
+	/pitfalls?\.(md|json)/i,
+	/constraints\.(md|json)/i,
+	/decisions\.(md|json)/i,
+	/\.sisyphus\/checkpoints\//i,
+]
+
+function extractPathsFromPatchText(patchText: string): string[] {
+	const paths: string[] = []
+	const regex = /^\*\*\*\s+(?:Add|Update|Delete)\s+File:\s+(.+)$/gim
+	let match: RegExpExecArray | null = regex.exec(patchText)
+	while (match) {
+		paths.push(match[1].trim())
+		match = regex.exec(patchText)
+	}
+	return paths
+}
+
+function extractCandidatePaths(args: Record<string, unknown>): string[] {
+	const candidates: string[] = []
+	if (typeof args.filePath === "string") candidates.push(args.filePath)
+	if (typeof args.file_path === "string") candidates.push(args.file_path)
+	if (typeof args.patchText === "string") {
+		candidates.push(...extractPathsFromPatchText(args.patchText))
+	}
+	return candidates
+}
+
+export function isCaptureToolCall(
+	toolName: string,
+	args: Record<string, unknown>,
+): boolean {
+	if (!EXECUTE_TOOLS.has(toolName.toLowerCase())) return false
+	const candidatePaths = extractCandidatePaths(args)
+	if (candidatePaths.length === 0) return false
+	return candidatePaths.some((path) => CAPTURE_PATH_PATTERNS.some((pattern) => pattern.test(path)))
 }

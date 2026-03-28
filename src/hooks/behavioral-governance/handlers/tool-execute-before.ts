@@ -66,7 +66,7 @@ export function createToolExecuteBeforeHandler(config: GovernanceConfig) {
 
 				if (state.readCount > 0 || !isDiagnosticBashCommand(command)) {
 					const ratio = state.readCount > 0 ? state.bashCount / state.readCount : state.bashCount
-					if (ratio > config.ratioThreshold && state.bashCount >= 6) {
+					if (ratio > config.ratioThreshold && state.bashCount >= config.minBashSamplesForRatioGate) {
 						const required = Math.ceil(state.bashCount / config.ratioThreshold) - state.readCount
 						log("[behavioral-governance] Execution ratio exceeded", {
 							sessionID: input.sessionID,

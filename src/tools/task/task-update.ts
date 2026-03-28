@@ -10,6 +10,14 @@ import {
   acquireLock,
 } from "../../features/claude-tasks/storage";
 import { syncTaskTodoUpdate } from "./todo-sync";
+import {
+  applyStatusTransitionMetadata,
+  claimOwnershipIfMissing,
+  readOwnerSessionID,
+} from "./task-lifecycle-metadata";
+import { validateDispatchTransition } from "./task-dispatch-guard";
+import { validateGranularityForStatus } from "./task-granularity-guard";
+import { applyTodoSyncOutcomeMetadata } from "./task-todo-sync-metadata";
 import { canCreatePersistentTask } from "../../shared/task-ownership-policy";
 
 const TASK_ID_PATTERN = /^T-[A-Za-z0-9-]+$/;
@@ -101,12 +109,24 @@ async function handleUpdate(
         return JSON.stringify({ error: "task_not_found" });
       }
 
+      const ownerSessionID = readOwnerSessionID(task);
+      if (ownerSessionID && ownerSessionID !== context.sessionID) {
+        return JSON.stringify({
+          error: "ownership_conflict",
+          ownerSessionID,
+        });
+      }
+
+      const metadataTimestamp = Date.now();
+      claimOwnershipIfMissing(task, context.sessionID, metadataTimestamp);
+
       if (validatedArgs.subject !== undefined) {
         task.subject = validatedArgs.subject;
       }
       if (validatedArgs.description !== undefined) {
         task.description = validatedArgs.description;
       }
+      const previousStatus = task.status;
       if (validatedArgs.status !== undefined) {
         task.status = validatedArgs.status;
       }
@@ -136,12 +156,79 @@ async function handleUpdate(
         });
       }
 
+      if (validatedArgs.status !== undefined && validatedArgs.status !== previousStatus) {
+        applyStatusTransitionMetadata(task, previousStatus, task.status, metadataTimestamp);
+      }
+
+      const granularityViolation = validateGranularityForStatus(task, task.status);
+      if (granularityViolation) {
+        return JSON.stringify({
+          error: granularityViolation.code,
+          message: granularityViolation.message,
+          missingFields: granularityViolation.missingFields,
+        });
+      }
+
+      const dispatchViolation = validateDispatchTransition({
+        taskDir,
+        taskId,
+        blockedBy: task.blockedBy,
+        status: task.status,
+      });
+      if (dispatchViolation) {
+        return JSON.stringify({
+          error: dispatchViolation.code,
+          message: dispatchViolation.message,
+          blockedBy: dispatchViolation.blockedBy,
+        });
+      }
+
       const validatedTask = TaskObjectSchema.parse(task);
       writeJsonAtomic(taskPath, validatedTask);
 
-      await syncTaskTodoUpdate(ctx, validatedTask, context.sessionID);
+      const todoSyncResult = await syncTaskTodoUpdate(ctx, validatedTask, context.sessionID);
 
-      return JSON.stringify({ task: validatedTask });
+      const response: {
+        task: typeof validatedTask
+        todoSync?: {
+          status: "failed"
+          reason: string
+          visibleWithinMs?: number
+          timeoutMs?: number
+          withinSla?: boolean
+        }
+      } = {
+        task: validatedTask,
+      }
+
+      const taskWithTodoOutcome = TaskObjectSchema.parse({
+        ...validatedTask,
+        metadata: { ...(validatedTask.metadata ?? {}) },
+      });
+      applyTodoSyncOutcomeMetadata(taskWithTodoOutcome, todoSyncResult, Date.now());
+      writeJsonAtomic(taskPath, taskWithTodoOutcome);
+      response.task = taskWithTodoOutcome;
+
+      if (todoSyncResult.status === "failed") {
+        response.todoSync = {
+          status: "failed",
+          reason: todoSyncResult.reason ?? "unknown",
+          ...(typeof todoSyncResult.visibleWithinMs === "number"
+            ? { visibleWithinMs: todoSyncResult.visibleWithinMs }
+            : {}),
+          ...(typeof todoSyncResult.timeoutMs === "number"
+            ? {
+                timeoutMs: todoSyncResult.timeoutMs,
+                withinSla:
+                  typeof todoSyncResult.visibleWithinMs === "number"
+                    ? todoSyncResult.visibleWithinMs <= todoSyncResult.timeoutMs
+                    : false,
+              }
+            : {}),
+        }
+      }
+
+      return JSON.stringify(response);
     } finally {
       lock.release();
     }

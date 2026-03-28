@@ -1,9 +1,32 @@
-import { describe, expect, test, beforeEach, afterEach, spyOn } from "bun:test"
+/// <reference types="bun-types/test-globals" />
+
+declare const require: (name: string) => any
+
+const { describe, expect, test, beforeEach, afterEach, spyOn } = require("bun:test")
+
 import { createKeywordDetectorHook } from "./index"
 import { setMainSession, updateSessionAgent, clearSessionAgent, _resetForTesting } from "../../features/claude-code-session-state"
 import { ContextCollector } from "../../features/context-injector"
 import * as sharedModule from "../../shared"
 import * as sessionState from "../../features/claude-code-session-state"
+
+async function applyModeTransform(
+  hook: ReturnType<typeof createKeywordDetectorHook>,
+  sessionID: string,
+  parts: Array<{ type: string; text?: string; [key: string]: unknown }>
+) {
+  const transformOutput = {
+    messages: [
+      {
+        info: { role: "user", id: `msg-${sessionID}`, sessionID } as any,
+        parts: [...parts] as any,
+      },
+    ],
+  }
+
+  await hook["experimental.chat.messages.transform"]({} as Record<string, never>, transformOutput as any)
+  return transformOutput.messages[0].parts as Array<{ type: string; text?: string; synthetic?: boolean }>
+}
 
 describe("keyword-detector message transform", () => {
   let logCalls: Array<{ msg: string; data?: unknown }>
@@ -46,13 +69,15 @@ describe("keyword-detector message transform", () => {
 
     // when - keyword detection runs
     await hook["chat.message"]({ sessionID }, output)
+    const transformedParts = await applyModeTransform(hook, sessionID, output.parts)
 
-    // then - message should be prepended to text part with separator and original text
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("---")
-    expect(textPart!.text).toContain("do something")
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    // then - mode message should be injected as synthetic part and original text preserved
+    const syntheticTextPart = transformedParts.find((p) => p.type === "text" && p.synthetic)
+    const userTextPart = transformedParts.find((p) => p.type === "text" && !p.synthetic)
+    expect(syntheticTextPart).toBeDefined()
+    expect(syntheticTextPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(userTextPart).toBeDefined()
+    expect(userTextPart!.text).toContain("do something")
   })
 
   test("should prepend search message to text part", async () => {
@@ -68,13 +93,15 @@ describe("keyword-detector message transform", () => {
 
     // when - keyword detection runs
     await hook["chat.message"]({ sessionID }, output)
+    const transformedParts = await applyModeTransform(hook, sessionID, output.parts)
 
-    // then - search message should be prepended to text part
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("---")
-    expect(textPart!.text).toContain("for the bug")
-    expect(textPart!.text).toContain("[search-mode]")
+    // then - search message should be injected as synthetic part
+    const syntheticTextPart = transformedParts.find((p) => p.type === "text" && p.synthetic)
+    const userTextPart = transformedParts.find((p) => p.type === "text" && !p.synthetic)
+    expect(syntheticTextPart).toBeDefined()
+    expect(syntheticTextPart!.text).toContain("[search-mode]")
+    expect(userTextPart).toBeDefined()
+    expect(userTextPart!.text).toContain("for the bug")
   })
 
   test("should NOT transform when no keywords detected", async () => {
@@ -144,10 +171,14 @@ describe("keyword-detector session filtering", () => {
       { sessionID: subagentSessionID },
       output
     )
+    const transformedParts = await applyModeTransform(hook, subagentSessionID, output.parts)
 
-    // then - search keyword should be filtered out based on mainSessionID comparison
-    const skipLog = logCalls.find(c => c.msg.includes("Skipping non-ultrawork keywords in non-main session"))
-    expect(skipLog).toBeDefined()
+    // then - search keyword should be filtered out for non-main sessions
+    const syntheticTextPart = transformedParts.find((p) => p.type === "text" && p.synthetic)
+    const userTextPart = transformedParts.find((p) => p.type === "text" && !p.synthetic)
+    expect(syntheticTextPart).toBeUndefined()
+    expect(userTextPart).toBeDefined()
+    expect(userTextPart!.text).toContain("search mode")
   })
 
   test("should allow ultrawork keywords in non-main session", async () => {
@@ -437,12 +468,15 @@ Please search for the bug in the code.`
 
     // when - keyword detection runs on mixed content
     await hook["chat.message"]({ sessionID }, output)
+    const transformedParts = await applyModeTransform(hook, sessionID, output.parts)
 
-    // then - should trigger search mode from user text only
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("[search-mode]")
-    expect(textPart!.text).toContain("Please search for the bug in the code.")
+    // then - search mode should be injected as synthetic part from user text
+    const syntheticTextPart = transformedParts.find((p) => p.type === "text" && p.synthetic)
+    const userTextPart = transformedParts.find((p) => p.type === "text" && !p.synthetic)
+    expect(syntheticTextPart).toBeDefined()
+    expect(syntheticTextPart!.text).toContain("[search-mode]")
+    expect(userTextPart).toBeDefined()
+    expect(userTextPart!.text).toContain("Please search for the bug in the code.")
   })
 
   test("should handle multiple system-reminder tags in message", async () => {
@@ -630,14 +664,16 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
 
     // when - ultrawork keyword detected with Sisyphus agent
     await hook["chat.message"]({ sessionID, agent: "sisyphus" }, output)
+    const transformedParts = await applyModeTransform(hook, sessionID, output.parts)
 
-    // then - should use normal ultrawork message with agent utilization instructions
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
-    expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
-    expect(textPart!.text).toContain("---")
-    expect(textPart!.text).toContain("implement this feature")
+    // then - should inject normal ultrawork message as synthetic part
+    const syntheticTextPart = transformedParts.find((p) => p.type === "text" && p.synthetic)
+    const userTextPart = transformedParts.find((p) => p.type === "text" && !p.synthetic)
+    expect(syntheticTextPart).toBeDefined()
+    expect(syntheticTextPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(syntheticTextPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
+    expect(userTextPart).toBeDefined()
+    expect(userTextPart!.text).toContain("implement this feature")
   })
 
   test("should use normal ultrawork message when agent is undefined", async () => {
@@ -652,14 +688,16 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
 
     // when - ultrawork keyword detected without agent
     await hook["chat.message"]({ sessionID }, output)
+    const transformedParts = await applyModeTransform(hook, sessionID, output.parts)
 
-    // then - should use normal ultrawork message (default behavior)
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
-    expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
-    expect(textPart!.text).toContain("---")
-    expect(textPart!.text).toContain("do something")
+    // then - should use normal ultrawork message as synthetic part
+    const syntheticTextPart = transformedParts.find((p) => p.type === "text" && p.synthetic)
+    const userTextPart = transformedParts.find((p) => p.type === "text" && !p.synthetic)
+    expect(syntheticTextPart).toBeDefined()
+    expect(syntheticTextPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(syntheticTextPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
+    expect(userTextPart).toBeDefined()
+    expect(userTextPart!.text).toContain("do something")
   })
 
   test("should skip ultrawork for prometheus but inject for sisyphus", async () => {
@@ -674,6 +712,7 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
       parts: [{ type: "text", text: "ultrawork plan" }],
     }
     await hook["chat.message"]({ sessionID: prometheusSessionID, agent: "prometheus" }, prometheusOutput)
+    const prometheusTransformedParts = await applyModeTransform(hook, prometheusSessionID, prometheusOutput.parts)
 
     // Second session with sisyphus
     const sisyphusSessionID = "sisyphus-second"
@@ -682,15 +721,18 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
       parts: [{ type: "text", text: "ultrawork implement" }],
     }
     await hook["chat.message"]({ sessionID: sisyphusSessionID, agent: "sisyphus" }, sisyphusOutput)
+    const sisyphusTransformedParts = await applyModeTransform(hook, sisyphusSessionID, sisyphusOutput.parts)
 
-    // then - prometheus should have no injection, sisyphus should have normal ultrawork
-    const prometheusTextPart = prometheusOutput.parts.find(p => p.type === "text")
-    expect(prometheusTextPart!.text).toBe("ultrawork plan")
+    // then - prometheus has no synthetic injection, sisyphus does
+    const prometheusSyntheticTextPart = prometheusTransformedParts.find((p) => p.type === "text" && p.synthetic)
+    expect(prometheusSyntheticTextPart).toBeUndefined()
 
-    const sisyphusTextPart = sisyphusOutput.parts.find(p => p.type === "text")
-    expect(sisyphusTextPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
-    expect(sisyphusTextPart!.text).toContain("---")
-    expect(sisyphusTextPart!.text).toContain("implement")
+    const sisyphusSyntheticTextPart = sisyphusTransformedParts.find((p) => p.type === "text" && p.synthetic)
+    const sisyphusUserTextPart = sisyphusTransformedParts.find((p) => p.type === "text" && !p.synthetic)
+    expect(sisyphusSyntheticTextPart).toBeDefined()
+    expect(sisyphusSyntheticTextPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(sisyphusUserTextPart).toBeDefined()
+    expect(sisyphusUserTextPart!.text).toContain("implement")
   })
 
   test("should use session state agent over stale input.agent (bug fix)", async () => {
@@ -709,14 +751,16 @@ describe("keyword-detector agent-specific ultrawork messages", () => {
 
     // when - hook receives stale input.agent="prometheus" but session state says "Sisyphus"
     await hook["chat.message"]({ sessionID, agent: "prometheus" }, output)
+    const transformedParts = await applyModeTransform(hook, sessionID, output.parts)
 
     // then - should use Sisyphus from session state, NOT prometheus from stale input
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
-    expect(textPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
-    expect(textPart!.text).toContain("---")
-    expect(textPart!.text).toContain("implement this")
+    const syntheticTextPart = transformedParts.find((p) => p.type === "text" && p.synthetic)
+    const userTextPart = transformedParts.find((p) => p.type === "text" && !p.synthetic)
+    expect(syntheticTextPart).toBeDefined()
+    expect(syntheticTextPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(syntheticTextPart!.text).not.toContain("YOU ARE A PLANNER, NOT AN IMPLEMENTER")
+    expect(userTextPart).toBeDefined()
+    expect(userTextPart!.text).toContain("implement this")
 
     // cleanup
     clearSessionAgent(sessionID)
@@ -824,12 +868,15 @@ describe("keyword-detector non-OMO agent skipping", () => {
 
     // when - keyword detection runs with Sisyphus (OMO agent)
     await hook["chat.message"]({ sessionID, agent: "sisyphus" }, output)
+    const transformedParts = await applyModeTransform(hook, sessionID, output.parts)
 
-    // then - keywords should be injected normally
-    const textPart = output.parts.find(p => p.type === "text")
-    expect(textPart).toBeDefined()
-    expect(textPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
-    expect(textPart!.text).toContain("implement this")
+    // then - keywords should be injected normally as synthetic part
+    const syntheticTextPart = transformedParts.find((p) => p.type === "text" && p.synthetic)
+    const userTextPart = transformedParts.find((p) => p.type === "text" && !p.synthetic)
+    expect(syntheticTextPart).toBeDefined()
+    expect(syntheticTextPart!.text).toContain("YOU MUST LEVERAGE ALL AVAILABLE AGENTS")
+    expect(userTextPart).toBeDefined()
+    expect(userTextPart!.text).toContain("implement this")
   })
 
   test("should skip keyword injection for agent names containing 'builder'", async () => {

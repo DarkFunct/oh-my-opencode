@@ -39,6 +39,8 @@ export interface GovernanceConfig {
 	ratioThreshold: number
 	/** Bash calls between checkpoint reminders (default 15) */
 	checkpointInterval: number
+	minBashSamplesForRatioGate: number
+	cognitiveMarkersThreshold: number
 	/** Source code path patterns to protect */
 	protectedPathPatterns: RegExp[]
 }
@@ -46,6 +48,8 @@ export interface GovernanceConfig {
 export const DEFAULT_GOVERNANCE_CONFIG: GovernanceConfig = {
 	ratioThreshold: 3,
 	checkpointInterval: 15,
+	minBashSamplesForRatioGate: 6,
+	cognitiveMarkersThreshold: 3,
 	protectedPathPatterns: [
 		// SVN/Git repo source files (PHP, Go, JS, TS, Vue, etc.)
 		/\b(svn-repo|git-repo)\b.*\.(php|go|js|ts|vue|svelte|json|yaml|yml|conf|ini|env)$/i,

@@ -104,6 +104,19 @@ export function classifyErrorType(error: unknown): string | undefined {
     return "invalid_api_key"
   }
 
+  if (errorName?.includes("auth") || /unauthori[sz]ed|forbidden|authentication/i.test(message)) {
+    return "auth_error"
+  }
+
+  if (
+    errorName?.includes("thinking")
+    || errorName?.includes("reasoning")
+    || /thinking\s+(?:is\s+)?(?:not\s+supported|unsupported|incompatible)/i.test(message)
+    || /reasoning\s+(?:is\s+)?(?:not\s+supported|unsupported|incompatible)/i.test(message)
+  ) {
+    return "thinking_incompatible"
+  }
+
   if (
     errorName?.includes("providermodelnotfounderror") ||
     errorName?.includes("modelnotfounderror") ||
@@ -178,6 +191,14 @@ export function isRetryableError(error: unknown, retryOnErrors: number[]): boole
   }
 
   if (errorType === "model_not_found") {
+    return true
+  }
+
+  if (errorType === "auth_error" || statusCode === 401 || statusCode === 403) {
+    return true
+  }
+
+  if (errorType === "thinking_incompatible") {
     return true
   }
 

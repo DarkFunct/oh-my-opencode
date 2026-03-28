@@ -7,8 +7,18 @@ import { detectCaptureViolation } from "./capture-gate"
 import { detectCognitiveFailureBlock } from "./failure-gate"
 import { buildBlockMessage, buildCaptureBlockMessage } from "./prompts"
 import { log } from "../../shared"
+import type { FixLifecycleGateConfig } from "./config"
+import { DEFAULT_FIX_LIFECYCLE_GATE_CONFIG } from "./config"
 
-export function createFixLifecycleGateHook(_ctx: PluginInput) {
+export function createFixLifecycleGateHook(
+	_ctx: PluginInput,
+	configOverrides?: Partial<FixLifecycleGateConfig>,
+) {
+	const config: FixLifecycleGateConfig = {
+		...DEFAULT_FIX_LIFECYCLE_GATE_CONFIG,
+		...configOverrides,
+	}
+
 	const toolExecuteBefore = async (
 		input: { tool: string; sessionID: string; callID: string },
 		output: { args: Record<string, unknown> },
@@ -22,7 +32,7 @@ export function createFixLifecycleGateHook(_ctx: PluginInput) {
 			const state = getCognitiveState(sessionID)
 			const filePath = extractFilePath(normalized, output.args)
 
-			const cognitiveFailure = detectCognitiveFailureBlock(state)
+			const cognitiveFailure = detectCognitiveFailureBlock(state, config)
 			if (cognitiveFailure) {
 				log("[fix-lifecycle-gate] Cognitive failure block", {
 					sessionID,
@@ -37,7 +47,7 @@ export function createFixLifecycleGateHook(_ctx: PluginInput) {
 				incrementConsecutiveFailure(state)
 			}
 
-			const verdict = detectRepeatFix(state)
+			const verdict = detectRepeatFix(state, config)
 
 			if (verdict.shouldBlock) {
 				log("[fix-lifecycle-gate] Blocking repeat fix", {
@@ -50,7 +60,7 @@ export function createFixLifecycleGateHook(_ctx: PluginInput) {
 				throw new Error(buildBlockMessage(verdict))
 			}
 
-			const captureVerdict = detectCaptureViolation(state)
+			const captureVerdict = detectCaptureViolation(state, config)
 			if (captureVerdict.shouldBlock) {
 				log("[fix-lifecycle-gate] Blocking — capture overdue", {
 					sessionID,

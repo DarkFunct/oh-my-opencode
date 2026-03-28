@@ -1,112 +1,41 @@
 import type { PluginInput } from "@opencode-ai/plugin";
 import { log } from "../../shared/logger";
 import type { Task } from "../../features/claude-tasks/types.ts";
-import { saveOpenCodeTodos, type OpenCodeTodo } from "../../hooks/claude-code-hooks/todo";
+import { syncTaskToTodo, todosMatch } from "./todo-sync-mapper";
+import { notifyTodoSyncLease } from "./todo-sync-lease";
+import { extractTodos, resolveTodoWriter } from "./todo-sync-writer";
+import type { TodoInfo, TodoSyncResult, TodoWriter } from "./todo-sync-types";
 
-export interface TodoInfo {
-  id?: string;
-  content: string;
-  status: "pending" | "in_progress" | "completed" | "cancelled";
-  priority?: "low" | "medium" | "high";
+export const TODO_SYNC_VISIBILITY_TIMEOUT_MS = 5_000;
+
+interface TodoSyncOptions {
+  visibilityTimeoutMs?: number;
 }
 
-type TodoWriter = (input: {
-  sessionID: string;
-  todos: TodoInfo[];
-}) => Promise<void>;
-
-function mapTaskStatusToTodoStatus(
-  taskStatus: Task["status"],
-): TodoInfo["status"] | null {
-  switch (taskStatus) {
-    case "pending":
-      return "pending";
-    case "in_progress":
-      return "in_progress";
-    case "completed":
-      return "completed";
-    case "deleted":
-      return null;
-    default:
-      return "pending";
-  }
+async function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutReason: string): Promise<T> {
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    setTimeout(() => reject(new Error(timeoutReason)), timeoutMs);
+  });
+  return Promise.race([promise, timeoutPromise]);
 }
 
-function extractPriority(
-  metadata?: Record<string, unknown>,
-): TodoInfo["priority"] | undefined {
-  if (!metadata) return undefined;
-
-  const priority = metadata.priority;
-  if (
-    typeof priority === "string" &&
-    ["low", "medium", "high"].includes(priority)
-  ) {
-    return priority as "low" | "medium" | "high";
-  }
-
-  return undefined;
-}
-
-function todosMatch(todo1: TodoInfo, todo2: TodoInfo): boolean {
-  if (todo1.id && todo2.id) {
-    return todo1.id === todo2.id;
-  }
-  return todo1.content === todo2.content;
-}
-
-export function syncTaskToTodo(task: Task): TodoInfo | null {
-  const todoStatus = mapTaskStatusToTodoStatus(task.status);
-
-  if (todoStatus === null) {
-    return null;
+function asSyncResult(
+  syncError: string | null,
+  visibleWithinMs?: number,
+  timeoutMs?: number,
+): TodoSyncResult {
+  if (syncError) {
+    return {
+      status: "failed",
+      reason: syncError,
+      ...(visibleWithinMs !== undefined ? { visibleWithinMs } : {}),
+      ...(timeoutMs !== undefined ? { timeoutMs } : {}),
+    };
   }
 
   return {
-    id: task.id,
-    content: task.subject,
-    status: todoStatus,
-    priority: extractPriority(task.metadata),
+    status: "synced",
   };
-}
-
-async function resolveTodoWriter(): Promise<TodoWriter | null> {
-  try {
-    const loader = "opencode/session/todo";
-    const mod = await import(loader);
-    const update = (mod as { Todo?: { update?: unknown } }).Todo?.update;
-    if (typeof update === "function") {
-      return update as TodoWriter;
-    }
-  } catch {
-    // SDK writer unavailable — expected in most environments
-  }
-
-  return createFileBasedWriter();
-}
-
-function createFileBasedWriter(): TodoWriter {
-  return async ({ sessionID, todos }) => {
-    const mapped: OpenCodeTodo[] = todos.map((t) => ({
-      content: t.content,
-      status: t.status,
-      priority: t.priority ?? "medium",
-      id: t.id ?? "",
-    }));
-    saveOpenCodeTodos(sessionID, mapped);
-    log("[todo-sync] Wrote todos via file-based fallback", { sessionID, count: mapped.length });
-  };
-}
-
-function extractTodos(response: unknown): TodoInfo[] {
-  const payload = response as { data?: unknown };
-  if (Array.isArray(payload?.data)) {
-    return payload.data as TodoInfo[];
-  }
-  if (Array.isArray(response)) {
-    return response as TodoInfo[];
-  }
-  return [];
 }
 
 export async function syncTaskTodoUpdate(
@@ -114,13 +43,26 @@ export async function syncTaskTodoUpdate(
   task: Task,
   sessionID: string,
   writer?: TodoWriter,
-): Promise<void> {
-  if (!ctx) return;
+  options?: TodoSyncOptions,
+): Promise<TodoSyncResult> {
+  const startedAt = Date.now();
+  const timeoutMs = options?.visibilityTimeoutMs ?? TODO_SYNC_VISIBILITY_TIMEOUT_MS;
+
+  if (!ctx) {
+    return {
+      status: "skipped",
+      reason: "missing_plugin_context",
+      visibleWithinMs: Date.now() - startedAt,
+      timeoutMs,
+    };
+  }
+
+  let syncError: string | null = null;
 
   try {
-    const response = await ctx.client.session.todo({
+    const response = await withTimeout(ctx.client.session.todo({
       path: { id: sessionID },
-    });
+    }), timeoutMs, `todo_fetch_timeout_${timeoutMs}ms`);
     const currentTodos = extractTodos(response);
     const taskTodo = syncTaskToTodo(task);
     const nextTodos = currentTodos.filter((todo) => {
@@ -140,14 +82,39 @@ export async function syncTaskTodoUpdate(
     }
 
     const resolvedWriter = writer ?? (await resolveTodoWriter());
-    if (!resolvedWriter) return;
-    await resolvedWriter({ sessionID, todos: nextTodos });
+    if (!resolvedWriter) {
+      syncError = "todo_writer_unavailable";
+      return asSyncResult(syncError);
+    }
+    await withTimeout(
+      resolvedWriter({ sessionID, todos: nextTodos }),
+      timeoutMs,
+      `todo_write_timeout_${timeoutMs}ms`,
+    );
   } catch (err) {
+    syncError = String(err);
     log("[todo-sync] Failed to sync task todo", {
       error: String(err),
       sessionID,
     });
+  } finally {
+    if (syncError) {
+      await notifyTodoSyncLease({
+        ctx,
+        sessionID,
+        action: "nack",
+        reason: syncError,
+      });
+    } else {
+      await notifyTodoSyncLease({
+        ctx,
+        sessionID,
+        action: "ack",
+      });
+    }
   }
+
+  return asSyncResult(syncError, Date.now() - startedAt, timeoutMs);
 }
 
 export async function syncAllTasksToTodos(
@@ -155,13 +122,18 @@ export async function syncAllTasksToTodos(
   tasks: Task[],
   sessionID?: string,
   writer?: TodoWriter,
-): Promise<void> {
+  options?: TodoSyncOptions,
+): Promise<TodoSyncResult> {
+  const startedAt = Date.now();
+  const timeoutMs = options?.visibilityTimeoutMs ?? TODO_SYNC_VISIBILITY_TIMEOUT_MS;
+  let syncError: string | null = null;
+
   try {
     let currentTodos: TodoInfo[] = [];
     try {
-      const response = await ctx.client.session.todo({
+      const response = await withTimeout(ctx.client.session.todo({
         path: { id: sessionID || "" },
-      });
+      }), timeoutMs, `todo_fetch_timeout_${timeoutMs}ms`);
       currentTodos = extractTodos(response);
     } catch (err) {
       log("[todo-sync] Failed to fetch current todos", {
@@ -204,7 +176,13 @@ export async function syncAllTasksToTodos(
 
     const resolvedWriter = writer ?? (await resolveTodoWriter());
     if (resolvedWriter && sessionID) {
-      await resolvedWriter({ sessionID, todos: finalTodos });
+      await withTimeout(
+        resolvedWriter({ sessionID, todos: finalTodos }),
+        timeoutMs,
+        `todo_write_timeout_${timeoutMs}ms`,
+      );
+    } else if (!resolvedWriter) {
+      syncError = "todo_writer_unavailable";
     }
 
     log("[todo-sync] Synced todos", {
@@ -212,9 +190,32 @@ export async function syncAllTasksToTodos(
       sessionID,
     });
   } catch (err) {
+    syncError = String(err);
     log("[todo-sync] Error in syncAllTasksToTodos", {
       error: String(err),
       sessionID,
     });
+  } finally {
+    if (sessionID) {
+      if (syncError) {
+        await notifyTodoSyncLease({
+          ctx,
+          sessionID,
+          action: "nack",
+          reason: syncError,
+        });
+      } else {
+        await notifyTodoSyncLease({
+          ctx,
+          sessionID,
+          action: "ack",
+        });
+      }
+    }
   }
+
+  return asSyncResult(syncError, Date.now() - startedAt, timeoutMs);
 }
+
+export { syncTaskToTodo } from "./todo-sync-mapper";
+export type { TodoInfo } from "./todo-sync-types";

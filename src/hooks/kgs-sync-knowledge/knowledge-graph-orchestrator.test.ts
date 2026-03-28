@@ -183,4 +183,24 @@ describe("knowledge-graph-orchestrator", () => {
     expect(output).toContain("<kgs_context>")
     expect(output).toContain("document: _meta/knowledge/pitfalls.md")
   })
+
+  it("returns kgs context only when read_source_mode is kgs_only", async () => {
+    const original = "1#abc12345|LOCAL_TEXT"
+    const orchestrator = new KnowledgeGraphOrchestrator("/repo", {
+      env: {
+        KGS_KNOWLEDGE_MODE: "dual",
+      },
+      knowledgeConfig: {
+        read_source_mode: "kgs_only",
+      },
+      createRetrievalService: () => ({
+        retrieveContext: async () => createRetrieveResponse(),
+      }),
+      logger: () => {},
+    })
+
+    const output = await orchestrator.augmentReadOutput("_meta/knowledge/pitfalls.md", original)
+    expect(output).toContain("<kgs_context>")
+    expect(output.includes("LOCAL_TEXT")).toBe(false)
+  })
 })

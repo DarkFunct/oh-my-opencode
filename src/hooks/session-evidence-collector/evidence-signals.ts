@@ -10,6 +10,7 @@ const GREP_TOOLS = new Set(["grep", "ast_grep_search"])
 
 const EXECUTE_TOOLS = new Set([
 	"edit", "write", "bash", "interactive_bash", "ast_grep_replace", "lsp_rename",
+	"apply_patch",
 ])
 
 /**
@@ -21,10 +22,24 @@ const NON_VERIFIABLE_EXTENSIONS = new Set([
 	".md", ".mdx", ".txt", ".yaml", ".yml", ".json", ".toml",
 ])
 
+const ALWAYS_VERIFIABLE_FILE_PATTERNS = [
+	/(^|\/)tsconfig(?:\.[^/]+)?\.json$/i,
+	/(^|\/)package\.json$/i,
+	/(^|\/)bunfig\.toml$/i,
+	/(^|\/)(?:vitest|jest)\.config\.[^/]+$/i,
+]
+
 export function isVerifiableFile(filePath: string): boolean {
 	const lower = filePath.toLowerCase()
+	if (ALWAYS_VERIFIABLE_FILE_PATTERNS.some((pattern) => pattern.test(lower))) {
+		return true
+	}
+
+	const extensionStart = lower.lastIndexOf(".")
+	if (extensionStart < 0) return true
+
 	return !NON_VERIFIABLE_EXTENSIONS.has(
-		lower.slice(lower.lastIndexOf(".")),
+		lower.slice(extensionStart),
 	)
 }
 
@@ -64,6 +79,32 @@ const PHILOSOPHICAL_FILE_PATTERNS = [
 	/\.sisyphus\/checkpoints\//,
 ]
 
+const EMPIRICAL_COMMAND_PATTERNS = [
+	/\bbun\s+test\b/i,
+	/\bnpm\s+(?:run\s+)?test\b/i,
+	/\bpnpm\s+(?:run\s+)?test\b/i,
+	/\byarn\s+(?:run\s+)?test\b/i,
+	/\bvitest\b/i,
+	/\bjest\b/i,
+	/\bpytest\b/i,
+	/\bgo\s+test\b/i,
+	/\bcargo\s+test\b/i,
+]
+
+const ENGINEERING_COMMAND_PATTERNS = [
+	/\bbun\s+run\s+build\b/i,
+	/\bnpm\s+run\s+build\b/i,
+	/\bpnpm\s+run\s+build\b/i,
+	/\byarn\s+build\b/i,
+	/\btsc\b/i,
+	/\btypecheck\b/i,
+	/\bdocker(?:-compose)?\b/i,
+	/\bbun\s+install\b/i,
+	/\bnpm\s+install\b/i,
+	/\bpnpm\s+install\b/i,
+	/\byarn\s+install\b/i,
+]
+
 export function isReadTool(tool: string): boolean {
 	return READ_TOOLS.has(tool.toLowerCase())
 }
@@ -84,8 +125,20 @@ export function detectMethodologyDimension(
 	state: SessionCognitiveState,
 	tool: string,
 	filePath?: string,
+	commandText?: string,
 ): MethodologyDimension | null {
 	const normalizedTool = tool.toLowerCase()
+
+	if ((normalizedTool === "bash" || normalizedTool === "interactive_bash") && commandText) {
+		if (EMPIRICAL_COMMAND_PATTERNS.some((pattern) => pattern.test(commandText))) {
+			state.dimensionsCovered.add("empirical")
+			return "empirical"
+		}
+		if (ENGINEERING_COMMAND_PATTERNS.some((pattern) => pattern.test(commandText))) {
+			state.dimensionsCovered.add("engineering")
+			return "engineering"
+		}
+	}
 
 	// File-path-specific detection takes priority over generic tool detection
 	// Reading tsconfig.json = engineering, reading _meta/harness/ = philosophical

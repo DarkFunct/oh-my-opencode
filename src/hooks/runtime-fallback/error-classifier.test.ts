@@ -1,4 +1,5 @@
-import { describe, expect, test } from "bun:test"
+declare const require: (name: string) => any
+const { describe, expect, test } = require("bun:test")
 
 import { classifyErrorType, extractAutoRetrySignal, extractStatusCode, isRetryableError } from "./error-classifier"
 
@@ -81,6 +82,25 @@ describe("runtime-fallback error classifier", () => {
 
     //#then
     expect(errorType).toBe("missing_api_key")
+    expect(retryable).toBe(true)
+  })
+
+  test("treats 401 unauthorized errors as retryable", () => {
+    const error = {
+      statusCode: 401,
+      message: "Unauthorized: invalid API key",
+    }
+
+    const retryable = isRetryableError(error, [429, 503, 529])
+    expect(retryable).toBe(true)
+  })
+
+  test("treats thinking incompatibility errors as retryable", () => {
+    const error = {
+      message: "thinking is not supported by this model",
+    }
+
+    const retryable = isRetryableError(error, [429, 503, 529])
     expect(retryable).toBe(true)
   })
 

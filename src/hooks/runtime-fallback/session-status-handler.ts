@@ -3,6 +3,7 @@ import type { AutoRetryHelpers } from "./auto-retry"
 import { HOOK_NAME } from "./constants"
 import { log } from "../../shared/logger"
 import { extractAutoRetrySignal } from "./error-classifier"
+import { classifyRuntimeFallbackReason } from "./runtime-fallback-reason"
 import { createFallbackState } from "./fallback-state"
 import { getFallbackModelsForSession } from "./fallback-models"
 import { normalizeRetryStatusMessage, extractRetryAttempt } from "../../shared/retry-status-utils"
@@ -33,6 +34,7 @@ export function createSessionStatusHandler(
     const retryMessage = typeof status.message === "string" ? status.message : ""
     const retrySignal = extractAutoRetrySignal({ status: retryMessage, message: retryMessage })
     if (!retrySignal) return
+    const fallbackReason = classifyRuntimeFallbackReason({ message: retrySignal.signal }, deps.config.retry_on_errors)
 
     const retryKey = `${extractRetryAttempt(status.attempt, retryMessage)}:${normalizeRetryStatusMessage(retryMessage)}`
     if (sessionStatusRetryKeys.get(sessionID) === retryKey) {
@@ -55,7 +57,12 @@ export function createSessionStatusHandler(
     }
 
     const resolvedAgent = await helpers.resolveAgentForSessionFromContext(sessionID, agent)
-    const fallbackModels = getFallbackModelsForSession(sessionID, resolvedAgent, pluginConfig)
+    const fallbackModels = getFallbackModelsForSession(
+      sessionID,
+      resolvedAgent,
+      pluginConfig,
+      fallbackReason,
+    )
     if (fallbackModels.length === 0) {
       if (!sessionStates.has(sessionID)) {
         sessionStatusRetryKeys.delete(sessionID)
@@ -104,6 +111,7 @@ export function createSessionStatusHandler(
       sessionID,
       model: state.currentModel,
       retryAttempt: status.attempt,
+      fallbackReason,
     })
 
     await helpers.abortSessionRequest(sessionID, "session.status.retry-signal")
@@ -114,6 +122,8 @@ export function createSessionStatusHandler(
       fallbackModels,
       resolvedAgent,
       source: "session.status",
+      reason: fallbackReason,
+      errorMessage: retrySignal.signal,
     })
   }
 }
