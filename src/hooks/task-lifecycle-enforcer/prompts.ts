@@ -72,3 +72,25 @@ export function buildTL06Warning(activeIds: string[]): string {
 		"请在会话结束前处理这些任务（完成、终止或回滚）。",
 	].join("\n")
 }
+
+export function buildTL05Warning(commitHash: string, message: string): string {
+	return [
+		"\n\n[TL-05 ⚠️ Git commit 未关联任务]",
+		`Commit ${commitHash} 的提交消息中未包含任何任务引用。`,
+		`消息: "${message}"`,
+		"",
+		"建议在 commit message 中包含任务引用（如 T-{uuid} 或 [T-{uuid}]），",
+		"以便自动追踪 VCS 与任务的关联关系。",
+	].join("\n")
+}
+
+export function buildTL07RevertInfo(commitHash: string, message: string): string {
+	return [
+		"\n\n[TL-07 ℹ️ 检测到 Revert Commit]",
+		`Commit ${commitHash} 是一个 revert 操作。`,
+		`消息: "${message}"`,
+		"",
+		"如果原 commit 关联了任务，对应任务应被标记为 rolled_back。",
+		"请确认任务状态是否需要更新。",
+	].join("\n")
+}

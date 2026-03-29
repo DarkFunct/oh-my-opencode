@@ -19,6 +19,8 @@ import {
 } from "./prompts"
 import { extractTaskId, parseTaskError, parseTaskOutput } from "./task-output-parser"
 import { evaluateEditWriteGates, evaluateCompletionGates } from "./tl-gate-evaluator"
+import { parseGitCommitOutput } from "./git-commit-parser"
+import { evaluateCommitGate } from "./commit-gate"
 import { log } from "../../shared"
 import { isSubagentSession } from "../../shared/task-ownership-policy"
 import { syncTaskLeaseSignal } from "./lease-sync"
@@ -132,6 +134,21 @@ export function createTaskLifecycleEnforcerHook(
 						sessionID,
 						editWriteCount: state.editWriteCallCount,
 					})
+				}
+
+				if (normalized === "bash" || normalized === "interactive_bash") {
+					const commit = parseGitCommitOutput(output.output)
+					if (commit) {
+						const commitGate = evaluateCommitGate(commit)
+						if (commitGate.appendMessages.length > 0) {
+							output.output = (output.output ?? "") + commitGate.appendMessages.join("")
+							log("[task-lifecycle-enforcer] Commit gate warnings injected", {
+								sessionID,
+								commitHash: commit.shortHash,
+								isRevert: commit.isRevert,
+							})
+						}
+					}
 				}
 			}
 		} catch (e) {
