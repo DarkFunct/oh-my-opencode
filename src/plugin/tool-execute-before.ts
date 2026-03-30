@@ -64,6 +64,11 @@ export function createToolExecuteBeforeHandler(args: {
     await hooks.prometheusMdOnly?.["tool.execute.before"]?.(input, output)
     await hooks.sisyphusJuniorNotepad?.["tool.execute.before"]?.(input, output)
     await hooks.atlasHook?.["tool.execute.before"]?.(input, output)
+    try { await hooks.writeSizeGuard?.["tool.execute.before"]?.(input, output) }
+    catch (e) {
+      if (e instanceof Error && e.message.startsWith("[")) throw e
+      log("[gaia-hook-error] writeSizeGuard before failed", { tool: input.tool, sessionID: input.sessionID, error: e })
+    }
     try { await hooks.knowledgeProtection?.["tool.execute.before"]?.(input, output) }
     catch (e) {
       if (e instanceof Error && e.message.startsWith("[")) throw e

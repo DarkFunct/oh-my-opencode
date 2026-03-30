@@ -30,6 +30,7 @@ import {
   createKnowledgeProtectionHook,
   createToolAbortRecoveryHook,
   createTaskHealthHook,
+  createWriteSizeGuardHook,
 } from "../../hooks"
 import {
   getOpenCodeVersion,
@@ -67,6 +68,7 @@ export type ToolGuardHooks = {
   knowledgeProtection: ReturnType<typeof createKnowledgeProtectionHook> | null
   toolAbortRecovery: ReturnType<typeof createToolAbortRecoveryHook> | null
   taskHealth: ReturnType<typeof createTaskHealthHook> | null
+  writeSizeGuard: ReturnType<typeof createWriteSizeGuardHook> | null
 }
 
 export function createToolGuardHooks(args: {
@@ -234,18 +236,24 @@ export function createToolGuardHooks(args: {
   const fixLifecycleGate = isHookEnabled("fix-lifecycle-gate")
     ? safeHook("fix-lifecycle-gate", () =>
         createFixLifecycleGateHook(ctx, {
-          repeatFixThreshold:
-            pluginConfig.cognitive_governance?.fix_lifecycle_gate?.repeat_fix_threshold,
-          sameFileFixThreshold:
-            pluginConfig.cognitive_governance?.fix_lifecycle_gate?.same_file_fix_threshold,
-          captureHardBlockThreshold:
-            pluginConfig.cognitive_governance?.fix_lifecycle_gate?.capture_hard_block_threshold,
-          executeActivityThreshold:
-            pluginConfig.cognitive_governance?.fix_lifecycle_gate?.execute_activity_threshold,
-          f3BlockThreshold:
-            pluginConfig.cognitive_governance?.fix_lifecycle_gate?.f3_block_threshold,
-          f2f4BlockThreshold:
-            pluginConfig.cognitive_governance?.fix_lifecycle_gate?.f2_f4_block_threshold,
+          configOverrides: {
+            repeatFixThreshold:
+              pluginConfig.cognitive_governance?.fix_lifecycle_gate?.repeat_fix_threshold,
+            sameFileFixThreshold:
+              pluginConfig.cognitive_governance?.fix_lifecycle_gate?.same_file_fix_threshold,
+            captureHardBlockThreshold:
+              pluginConfig.cognitive_governance?.fix_lifecycle_gate?.capture_hard_block_threshold,
+            executeActivityThreshold:
+              pluginConfig.cognitive_governance?.fix_lifecycle_gate?.execute_activity_threshold,
+            f3BlockThreshold:
+              pluginConfig.cognitive_governance?.fix_lifecycle_gate?.f3_block_threshold,
+            f2f4BlockThreshold:
+              pluginConfig.cognitive_governance?.fix_lifecycle_gate?.f2_f4_block_threshold,
+          },
+          gateResponseConfig: {
+            hardBlockThreshold: pluginConfig.cognitive_governance?.gate_response?.hard_block_threshold,
+            abortThreshold: pluginConfig.cognitive_governance?.gate_response?.abort_threshold,
+          },
         }))
     : null
 
@@ -263,6 +271,14 @@ export function createToolGuardHooks(args: {
 
   const taskHealth = isHookEnabled("task-health")
     ? safeHook("task-health", () => createTaskHealthHook(ctx))
+    : null
+
+  const writeSizeGuard = isHookEnabled("write-size-guard")
+    ? safeHook("write-size-guard", () =>
+        createWriteSizeGuardHook(ctx, {
+          maxLines: pluginConfig.cognitive_governance?.write_size_guard?.max_lines,
+          enabled: pluginConfig.cognitive_governance?.write_size_guard?.enabled,
+        }))
     : null
 
   return {
@@ -293,5 +309,6 @@ export function createToolGuardHooks(args: {
     knowledgeProtection,
     toolAbortRecovery,
     taskHealth,
+    writeSizeGuard,
   }
 }
