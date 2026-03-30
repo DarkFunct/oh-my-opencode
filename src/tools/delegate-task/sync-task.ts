@@ -10,6 +10,7 @@ import { formatDuration } from "./time-formatter"
 import { formatDetailedError } from "./error-formatting"
 import { syncTaskDeps, type SyncTaskDeps } from "./sync-task-deps"
 import { setSessionFallbackChain, clearSessionFallbackChain } from "../../hooks/model-fallback/hook"
+import { getGateNotificationSuffix } from "../../features/background-agent/gate-info-reader"
 
 export async function executeSyncTask(
   args: DelegateTaskArgs,
@@ -148,11 +149,12 @@ export async function executeSyncTask(
       }
 
       const duration = formatDuration(startTime)
+      const gateInfo = await getGateNotificationSuffix(sessionID)
 
       return `Task completed in ${duration}.
 
 Agent: ${agentToUse}${args.category ? ` (category: ${args.category})` : ""}
-
+${gateInfo}
 ---
 
 ${result.textContent || "(No text output)"}

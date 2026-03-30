@@ -53,6 +53,7 @@ import { pruneStaleTasksAndNotifications } from "./task-poller"
 import { checkAndInterruptStaleTasks } from "./task-poller"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 import { isActiveSessionStatus, isTerminalSessionStatus } from "./session-status-classifier"
+import { getGateNotificationSuffix } from "./gate-info-reader"
 import {
   detectRepetitiveToolUse,
   recordToolCall,
@@ -1562,6 +1563,7 @@ export class BackgroundManager {
           ? "ERROR"
           : "CANCELLED"
     const errorInfo = task.error ? `\n**Error:** ${task.error}` : ""
+    const gateInfo = task.sessionID ? await getGateNotificationSuffix(task.sessionID) : ""
 
     let notification: string
     if (allComplete) {
@@ -1583,7 +1585,7 @@ Use \`background_output(task_id="<id>")\` to retrieve each result.
 [BACKGROUND TASK ${statusText}]
 **ID:** \`${task.id}\`
 **Description:** ${task.description}
-**Duration:** ${duration}${errorInfo}
+**Duration:** ${duration}${errorInfo}${gateInfo}
 
 **${remainingCount} task${remainingCount === 1 ? "" : "s"} still in progress.** You WILL be notified when ALL complete.
 Do NOT poll - continue productive work.
