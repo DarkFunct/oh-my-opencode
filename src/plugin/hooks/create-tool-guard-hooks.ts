@@ -235,21 +235,27 @@ export function createToolGuardHooks(args: {
 
   const fixLifecycleGate = isHookEnabled("fix-lifecycle-gate")
     ? safeHook("fix-lifecycle-gate", () =>
-        createFixLifecycleGateHook(ctx, {
-          configOverrides: {
-            repeatFixThreshold:
-              pluginConfig.cognitive_governance?.fix_lifecycle_gate?.repeat_fix_threshold,
-            sameFileFixThreshold:
-              pluginConfig.cognitive_governance?.fix_lifecycle_gate?.same_file_fix_threshold,
-            captureHardBlockThreshold:
-              pluginConfig.cognitive_governance?.fix_lifecycle_gate?.capture_hard_block_threshold,
-            executeActivityThreshold:
-              pluginConfig.cognitive_governance?.fix_lifecycle_gate?.execute_activity_threshold,
-            f3BlockThreshold:
-              pluginConfig.cognitive_governance?.fix_lifecycle_gate?.f3_block_threshold,
-            f2f4BlockThreshold:
-              pluginConfig.cognitive_governance?.fix_lifecycle_gate?.f2_f4_block_threshold,
-          },
+		createFixLifecycleGateHook(ctx, {
+			configOverrides: {
+				repeatFixThreshold:
+					pluginConfig.cognitive_governance?.fix_lifecycle_gate?.repeat_fix_threshold,
+				sameFileFixThreshold:
+					pluginConfig.cognitive_governance?.fix_lifecycle_gate?.same_file_fix_threshold,
+				captureHardBlockThreshold:
+					pluginConfig.cognitive_governance?.fix_lifecycle_gate?.capture_hard_block_threshold,
+				executeActivityThreshold:
+					pluginConfig.cognitive_governance?.fix_lifecycle_gate?.execute_activity_threshold,
+				f3BlockThreshold:
+					pluginConfig.cognitive_governance?.fix_lifecycle_gate?.f3_block_threshold,
+				f2f4BlockThreshold:
+					pluginConfig.cognitive_governance?.fix_lifecycle_gate?.f2_f4_block_threshold,
+				dvWarningThreshold:
+					pluginConfig.cognitive_governance?.delivery_verification?.dv_warning_threshold,
+				caTrigggerFailures:
+					pluginConfig.cognitive_governance?.causal_analysis?.ca_trigger_failures,
+				caRequiredReadsBeforeRetry:
+					pluginConfig.cognitive_governance?.causal_analysis?.ca_required_reads_before_retry,
+			},
           gateResponseConfig: {
             hardBlockThreshold: pluginConfig.cognitive_governance?.gate_response?.hard_block_threshold,
             abortThreshold: pluginConfig.cognitive_governance?.gate_response?.abort_threshold,

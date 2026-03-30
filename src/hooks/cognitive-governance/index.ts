@@ -1,7 +1,7 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import type { Message, Part } from "@opencode-ai/sdk"
 import type { CognitiveGovernanceConfig } from "../../config"
-import type { CognitiveFailureId } from "../cognitive-governance-shared/types"
+import type { CognitiveFailureId, SessionCognitiveState } from "../cognitive-governance-shared/types"
 import { getCognitiveState, deleteCognitiveSession } from "../cognitive-governance-shared/state"
 import {
 	setCognitiveReviewVerdict,
@@ -17,6 +17,8 @@ import { extractAssistantThinkingTrace } from "./thinking-trace-extractor"
 import { extractLatestStageBVerdict } from "./stage-b-verdict-parser"
 import { buildStageBReviewRequest, shouldRequestStageBReview } from "./stage-b-review-request"
 import { buildCognitiveDirective } from "./prompts"
+import { buildDeliveryVerificationBlock, buildDocumentationGovernanceBlock, type DirectiveBlock } from "./delivery-verification-prompts"
+import { buildCausalAnalysisBlock } from "./causal-analysis-prompts"
 import { injectCognitiveDirective, type CognitiveDirectiveInjectionConfig } from "./cognitive-injector"
 import { detectCognitiveFailureWarn } from "./failure-directives"
 import { recordInjection, checkInjectionResolutions } from "./injection-tracker"
@@ -90,12 +92,15 @@ export function createCognitiveGovernanceHook(
 
 			const failureWarning = detectCognitiveFailureWarn(state)
 			const baseDirective = failureWarning ?? buildCognitiveDirective(assessment)
-			if (!baseDirective) return
+
+			const dvDgCaBlocks = collectDvDgCaBlocks(state, config)
+			const enrichedDirective = composeDirectiveWithBlocks(baseDirective, dvDgCaBlocks)
+			if (!enrichedDirective) return
 
 			const shouldInjectStageBRequest = !stageBVerdict && shouldRequestStageBReview(stageAVerdict)
 			const directive = shouldInjectStageBRequest && stageAVerdict
-				? `${baseDirective}\n\n${buildStageBReviewRequest(stageAVerdict)}`
-				: baseDirective
+				? `${enrichedDirective}\n\n${buildStageBReviewRequest(stageAVerdict)}`
+				: enrichedDirective
 
 			if (!directive) return
 
@@ -156,4 +161,53 @@ function extractFailureId(directive: string): CognitiveFailureId | "cognitive_di
 	const match = directive.match(FAILURE_ID_PATTERN)
 	if (match) return `F${match[1]}` as CognitiveFailureId
 	return "cognitive_directive"
+}
+
+function collectDvDgCaBlocks(
+	state: SessionCognitiveState,
+	config?: CognitiveGovernanceConfig,
+): DirectiveBlock[] {
+	const blocks: DirectiveBlock[] = []
+
+	const dvEnabled = config?.delivery_verification?.enabled ?? true
+	if (dvEnabled) {
+		const dvBlock = buildDeliveryVerificationBlock(state.deliveryEvidence)
+		if (dvBlock) blocks.push(dvBlock)
+	}
+
+	const dgEnabled = config?.documentation_governance?.enabled ?? true
+	if (dgEnabled) {
+		const dgThreshold = config?.documentation_governance?.code_without_doc_threshold ?? 3
+		const dgBlock = buildDocumentationGovernanceBlock(state.documentationEvidence, dgThreshold)
+		if (dgBlock) blocks.push(dgBlock)
+	}
+
+	const caEnabled = config?.causal_analysis?.enabled ?? true
+	if (caEnabled) {
+		const caThreshold = config?.causal_analysis?.ca_trigger_failures ?? 2
+		const caBlock = buildCausalAnalysisBlock(state.consecutiveFixFailures, caThreshold)
+		if (caBlock) blocks.push(caBlock)
+	}
+
+	return blocks
+}
+
+const PRIORITY_ORDER: Record<DirectiveBlock["priority"], number> = {
+	critical: 0,
+	high: 1,
+	medium: 2,
+	low: 3,
+}
+
+function composeDirectiveWithBlocks(
+	baseDirective: string | null,
+	blocks: DirectiveBlock[],
+): string | null {
+	if (blocks.length === 0) return baseDirective
+
+	const sorted = [...blocks].sort((a, b) => PRIORITY_ORDER[a.priority] - PRIORITY_ORDER[b.priority])
+	const blockText = sorted.map((b) => b.content).join("\n\n")
+
+	if (!baseDirective) return blockText
+	return `${baseDirective}\n\n${blockText}`
 }

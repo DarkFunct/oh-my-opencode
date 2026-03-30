@@ -3659,6 +3659,109 @@
             "enabled"
           ],
           "additionalProperties": false
+        },
+        "delivery_verification": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "build_commands": {
+              "default": [
+                "bun run build",
+                "npm run build"
+              ],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "dv_warning_threshold": {
+              "default": 2,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "stale_build_reminder_interval": {
+              "default": 5,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            }
+          },
+          "required": [
+            "enabled",
+            "build_commands",
+            "dv_warning_threshold",
+            "stale_build_reminder_interval"
+          ],
+          "additionalProperties": false
+        },
+        "documentation_governance": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "public_interface_patterns": {
+              "default": [
+                "src/hooks/*/index.ts",
+                "src/config/schema/*.ts",
+                "**/types.ts",
+                "packages/*/src/**"
+              ],
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "code_without_doc_threshold": {
+              "default": 3,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            },
+            "capture_hard_block": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "enabled",
+            "public_interface_patterns",
+            "code_without_doc_threshold",
+            "capture_hard_block"
+          ],
+          "additionalProperties": false
+        },
+        "causal_analysis": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            },
+            "ca_trigger_failures": {
+              "default": 2,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 5
+            },
+            "ca_required_reads_before_retry": {
+              "default": 3,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 10
+            }
+          },
+          "required": [
+            "enabled",
+            "ca_trigger_failures",
+            "ca_required_reads_before_retry"
+          ],
+          "additionalProperties": false
         }
       },
       "additionalProperties": false

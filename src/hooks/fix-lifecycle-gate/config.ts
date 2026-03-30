@@ -5,6 +5,9 @@ export interface FixLifecycleGateConfig {
   executeActivityThreshold: number
   f3BlockThreshold: number
   f2f4BlockThreshold: number
+  dvWarningThreshold: number
+  caTrigggerFailures: number
+  caRequiredReadsBeforeRetry: number
 }
 
 export const DEFAULT_FIX_LIFECYCLE_GATE_CONFIG: FixLifecycleGateConfig = {
@@ -14,4 +17,7 @@ export const DEFAULT_FIX_LIFECYCLE_GATE_CONFIG: FixLifecycleGateConfig = {
   executeActivityThreshold: 3,
   f3BlockThreshold: 5,
   f2f4BlockThreshold: 3,
+  dvWarningThreshold: 2,
+  caTrigggerFailures: 2,
+  caRequiredReadsBeforeRetry: 3,
 }

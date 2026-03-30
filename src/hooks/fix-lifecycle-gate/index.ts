@@ -7,6 +7,8 @@ import { isExecuteTool } from "../session-evidence-collector/evidence-signals"
 import { detectRepeatFix, incrementConsecutiveFailure } from "./repeat-fix-detector"
 import { detectCaptureViolation } from "./capture-gate"
 import { detectCognitiveFailureBlock } from "./failure-gate"
+import { evaluateDeliveryReadiness } from "./delivery-gate"
+import { evaluateCausalAnalysisRequired } from "./causal-analysis-gate"
 import { buildBlockMessage, buildCaptureBlockMessage } from "./prompts"
 import { log } from "../../shared"
 import type { FixLifecycleGateConfig } from "./config"
@@ -34,6 +36,7 @@ export function createFixLifecycleGateHook(
 	}
 
 	const blockCountMap = new Map<string, number>()
+	const dvWarningCountMap = new Map<string, number>()
 
 	function getBlockCount(sessionID: string, gateId: string): number {
 		const key = `${sessionID}:${gateId}`

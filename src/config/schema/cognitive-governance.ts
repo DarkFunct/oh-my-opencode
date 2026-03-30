@@ -80,6 +80,31 @@ export const CognitiveGovernanceWriteSizeGuardSchema = z.object({
 	enabled: z.boolean().default(true),
 })
 
+export const CognitiveGovernanceDeliveryVerificationSchema = z.object({
+	enabled: z.boolean().default(true),
+	build_commands: z.array(z.string()).default(["bun run build", "npm run build"]),
+	dv_warning_threshold: z.number().int().min(1).max(5).default(2),
+	stale_build_reminder_interval: z.number().int().min(1).max(20).default(5),
+})
+
+export const CognitiveGovernanceDocumentationGovernanceSchema = z.object({
+	enabled: z.boolean().default(true),
+	public_interface_patterns: z.array(z.string()).default([
+		"src/hooks/*/index.ts",
+		"src/config/schema/*.ts",
+		"**/types.ts",
+		"packages/*/src/**",
+	]),
+	code_without_doc_threshold: z.number().int().min(1).max(10).default(3),
+	capture_hard_block: z.boolean().default(true),
+})
+
+export const CognitiveGovernanceCausalAnalysisSchema = z.object({
+	enabled: z.boolean().default(true),
+	ca_trigger_failures: z.number().int().min(1).max(5).default(2),
+	ca_required_reads_before_retry: z.number().int().min(1).max(10).default(3),
+})
+
 export const CognitiveGovernanceConfigSchema = z.object({
 	directive_budget: CognitiveGovernanceDirectiveBudgetSchema.optional(),
 	methodology_chain_audit: CognitiveGovernanceMethodologyChainAuditSchema.optional(),
@@ -94,6 +119,9 @@ export const CognitiveGovernanceConfigSchema = z.object({
 	gate_response: CognitiveGovernanceGateResponseSchema.optional(),
 	tool_abort: CognitiveGovernanceToolAbortSchema.optional(),
 	write_size_guard: CognitiveGovernanceWriteSizeGuardSchema.optional(),
+	delivery_verification: CognitiveGovernanceDeliveryVerificationSchema.optional(),
+	documentation_governance: CognitiveGovernanceDocumentationGovernanceSchema.optional(),
+	causal_analysis: CognitiveGovernanceCausalAnalysisSchema.optional(),
 })
 
 export type CognitiveGovernanceConfig = z.infer<typeof CognitiveGovernanceConfigSchema>

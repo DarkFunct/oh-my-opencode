@@ -8,6 +8,7 @@ import { fuseConfidence } from "./confidence-fusion"
 import { detectResetTriggers } from "./reset-triggers"
 import { executeResets } from "./reset-executor"
 import { trackFileEdit, trackReadFile, trackBuildResult, trackTestResult } from "./edit-tracker"
+import { trackDeliveryEvidence, trackDocumentationEvidence } from "./delivery-doc-tracker"
 import {
 	evaluateCaptureDocumentationMaintenance,
 	type DocumentationAutoManagementConfig,
@@ -132,6 +133,9 @@ export function createSessionEvidenceCollectorHook(
 			if (normalized === "lsp_diagnostics" && hasCleanDiagnostics(safeOutput)) {
 				state.editsSinceLastVerification = 0
 			}
+
+			trackDeliveryEvidence(state, normalized, output.metadata, safeOutput)
+			trackDocumentationEvidence(state, normalized, output.metadata)
 
 			const source = classifySource(normalized)
 			const signals = extractStructuralSignals(source, safeOutput, output.metadata)
