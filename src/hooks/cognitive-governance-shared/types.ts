@@ -173,6 +173,33 @@ export interface CognitiveFailure {
 	directive: string
 }
 
+// DV-01~03: Delivery Verification evidence
+export interface DeliveryEvidence {
+	lastBuildTimestamp: number | null
+	lastBuildCommand: string | null
+	buildExitCode: number | null
+	lastCodeChangeTimestamp: number | null
+	codeChangesSinceBuild: number
+	lastTestTimestamp: number | null
+	lastTestResult: "pass" | "fail" | "unknown"
+	testsSinceCodeChange: boolean
+}
+
+// DG-01~04: Documentation Governance evidence
+export interface DocumentationEvidence {
+	publicInterfaceChanges: Array<{
+		filePath: string
+		timestamp: number
+		changeType: "export" | "config" | "type" | "hook" | "api"
+	}>
+	docChanges: Array<{
+		filePath: string
+		timestamp: number
+	}>
+	codeChangesWithoutDocUpdate: number
+	lastDocChangeTimestamp: number | null
+}
+
 // V-1: Injection effectiveness tracking
 export interface InjectionEvent {
 	failureId: CognitiveFailureId | "cognitive_directive"
@@ -222,4 +249,8 @@ export interface SessionCognitiveState {
 
 	// V-1: Injection effectiveness tracking
 	injectionHistory: InjectionEvent[]
+
+	// DV/DG evidence (L1 delivery + documentation tracking)
+	deliveryEvidence: DeliveryEvidence
+	documentationEvidence: DocumentationEvidence
 }

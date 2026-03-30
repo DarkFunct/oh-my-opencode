@@ -32,6 +32,22 @@ function createDefaultState(): SessionCognitiveState {
 		dimensionsCovered: new Set(),
 		roundsSinceCaptureNeeded: 0,
 		injectionHistory: [],
+		deliveryEvidence: {
+			lastBuildTimestamp: null,
+			lastBuildCommand: null,
+			buildExitCode: null,
+			lastCodeChangeTimestamp: null,
+			codeChangesSinceBuild: 0,
+			lastTestTimestamp: null,
+			lastTestResult: "unknown",
+			testsSinceCodeChange: false,
+		},
+		documentationEvidence: {
+			publicInterfaceChanges: [],
+			docChanges: [],
+			codeChangesWithoutDocUpdate: 0,
+			lastDocChangeTimestamp: null,
+		},
 	}
 }
 
