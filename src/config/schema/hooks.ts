@@ -68,6 +68,7 @@ export const HookNameSchema = z.enum([
   "knowledge-protection",
   "tool-abort-recovery",
   "task-health",
+  "write-size-guard",
 ])
 
 export type HookName = z.infer<typeof HookNameSchema>

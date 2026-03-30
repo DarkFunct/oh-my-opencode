@@ -66,6 +66,20 @@ export const CognitiveGovernancePerceptionDefaultsSchema = z.object({
 	workspace_root: z.string().trim().min(1).optional(),
 })
 
+export const CognitiveGovernanceGateResponseSchema = z.object({
+	hard_block_threshold: z.number().int().min(1).max(20).default(3),
+	abort_threshold: z.number().int().min(1).max(50).default(5),
+})
+
+export const CognitiveGovernanceToolAbortSchema = z.object({
+	max_consecutive: z.number().int().min(1).max(20).default(3),
+})
+
+export const CognitiveGovernanceWriteSizeGuardSchema = z.object({
+	max_lines: z.number().int().min(50).max(1000).default(200),
+	enabled: z.boolean().default(true),
+})
+
 export const CognitiveGovernanceConfigSchema = z.object({
 	directive_budget: CognitiveGovernanceDirectiveBudgetSchema.optional(),
 	methodology_chain_audit: CognitiveGovernanceMethodologyChainAuditSchema.optional(),
@@ -77,6 +91,9 @@ export const CognitiveGovernanceConfigSchema = z.object({
 	fix_lifecycle_gate: CognitiveGovernanceFixLifecycleGateSchema.optional(),
 	documentation_auto_management: CognitiveGovernanceDocumentationAutoManagementSchema.optional(),
 	perception_defaults: CognitiveGovernancePerceptionDefaultsSchema.optional(),
+	gate_response: CognitiveGovernanceGateResponseSchema.optional(),
+	tool_abort: CognitiveGovernanceToolAbortSchema.optional(),
+	write_size_guard: CognitiveGovernanceWriteSizeGuardSchema.optional(),
 })
 
 export type CognitiveGovernanceConfig = z.infer<typeof CognitiveGovernanceConfigSchema>

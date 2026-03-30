@@ -3602,6 +3602,63 @@
             "max_chars_per_file"
           ],
           "additionalProperties": false
+        },
+        "gate_response": {
+          "type": "object",
+          "properties": {
+            "hard_block_threshold": {
+              "default": 3,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            },
+            "abort_threshold": {
+              "default": 5,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 50
+            }
+          },
+          "required": [
+            "hard_block_threshold",
+            "abort_threshold"
+          ],
+          "additionalProperties": false
+        },
+        "tool_abort": {
+          "type": "object",
+          "properties": {
+            "max_consecutive": {
+              "default": 3,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 20
+            }
+          },
+          "required": [
+            "max_consecutive"
+          ],
+          "additionalProperties": false
+        },
+        "write_size_guard": {
+          "type": "object",
+          "properties": {
+            "max_lines": {
+              "default": 200,
+              "type": "integer",
+              "minimum": 50,
+              "maximum": 1000
+            },
+            "enabled": {
+              "default": true,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "max_lines",
+            "enabled"
+          ],
+          "additionalProperties": false
         }
       },
       "additionalProperties": false
