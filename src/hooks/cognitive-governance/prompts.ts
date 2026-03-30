@@ -1,5 +1,6 @@
 import type { CognitiveAssessment } from "./conversation-analyzer"
 import type { CognitiveLayer } from "../cognitive-governance-shared/types"
+import { DEFAULT_REMEDIATION_MAP } from "../fix-lifecycle-gate/methodology-remediation-map"
 
 const LAYER_LABELS: Record<CognitiveLayer, string> = {
 	perception: "感知层 (Perception)",
@@ -38,13 +39,26 @@ export function buildCognitiveDirective(assessment: CognitiveAssessment): string
 }
 
 function buildDimensionGapReminder(assessment: CognitiveAssessment): string {
-	const gapNames = assessment.dimensionsGap.slice(0, 3).join(", ")
-	return [
+	const lines: string[] = [
 		"⚠️ 方法论覆盖不足",
 		`已覆盖: ${assessment.dimensionsCovered.join(", ")}`,
-		`未覆盖: ${gapNames}`,
-		"建议扩展认知维度后再推进执行。",
-	].join("\n")
+		`未覆盖: ${assessment.dimensionsGap.slice(0, 3).join(", ")}`,
+		"",
+		"**各缺失维度的操作指引：**",
+	]
+
+	for (const dim of assessment.dimensionsGap.slice(0, 3)) {
+		const action = DEFAULT_REMEDIATION_MAP[dim]
+		if (action) {
+			lines.push(`- **${dim}** (${action.description}):`)
+			for (const target of action.readTargets) {
+				lines.push(`    → ${target}`)
+			}
+		}
+	}
+
+	lines.push("", "完成以上任意缺失维度的操作后，覆盖将自动更新。")
+	return lines.join("\n")
 }
 
 function buildErrorGuidance(assessment: CognitiveAssessment): string {

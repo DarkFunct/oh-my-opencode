@@ -15,11 +15,12 @@ import type { MethodologyCoverageConfig } from "./methodology-coverage-gate"
 import { evaluateBatchClassification, DEFAULT_BATCH_CLASSIFICATION_CONFIG } from "./batch-classification-gate"
 import type { BatchClassificationConfig } from "./batch-classification-gate"
 import { buildBlockMessage, buildCaptureBlockMessage } from "./prompts"
+import { buildMethodologyCoverageBlockMessage } from "./methodology-coverage-prompts"
 import { log } from "../../shared"
 import type { FixLifecycleGateConfig } from "./config"
 import { DEFAULT_FIX_LIFECYCLE_GATE_CONFIG } from "./config"
 import { getGateMetadataDir } from "../gate-metadata-path"
-import { shouldAbortSession, executeSessionAbort } from "./abort-handler"
+import { shouldAbortSession, executeSessionAbort, type AbortContext } from "./abort-handler"
 
 export interface FixLifecycleGateOptions {
 	configOverrides?: Partial<FixLifecycleGateConfig>
@@ -53,6 +54,7 @@ export function createFixLifecycleGateHook(
 	const blockCountMap = new Map<string, number>()
 	const dvWarningCountMap = new Map<string, number>()
 	const mcWarningCountMap = new Map<string, number>()
+	const sessionResponseCountMap = new Map<string, number>()
 
 	function getBlockCount(sessionID: string, gateId: string): number {
 		const key = `${sessionID}:${gateId}`
@@ -61,17 +63,29 @@ export function createFixLifecycleGateHook(
 		return count
 	}
 
+	function getSessionResponseCount(sessionID: string): number {
+		return sessionResponseCountMap.get(sessionID) ?? 0
+	}
+
+	function incrementSessionResponseCount(sessionID: string): void {
+		const current = sessionResponseCountMap.get(sessionID) ?? 0
+		sessionResponseCountMap.set(sessionID, current + 1)
+	}
+
 	async function writeGateBlock(sessionID: string, gateId: string, reason: string, recoveryAction: string): Promise<void> {
 		try {
 			const blockCount = getBlockCount(sessionID, gateId)
-			const severity = escalate(blockCount, grConfig)
+			incrementSessionResponseCount(sessionID)
+			const responseCount = getSessionResponseCount(sessionID)
+			const severity = escalate(blockCount, grConfig, responseCount)
 			const response = createGateResponse({ gateId, severity, reason, recoveryAction, blockCount })
 			const dir = getGateMetadataDir(sessionID)
 			await writeGateMetadata(dir, { gateResponse: response, timestamp: new Date().toISOString(), sessionId: sessionID, totalBlockCount: blockCount })
 			await appendGateEvent(dir, { sessionId: sessionID, gateId, severity, blockCount, timestamp: new Date().toISOString() })
 			if (shouldAbortSession(severity)) {
-				log("[fix-lifecycle-gate] Abort threshold reached — terminating session", { sessionID, gateId, blockCount })
-				await executeSessionAbort(_ctx, sessionID)
+				log("[fix-lifecycle-gate] Abort threshold reached — terminating session", { sessionID, gateId, blockCount, responseCount })
+				const abortCtx: AbortContext = { sessionID, gateId, blockCount, responseCount, reason }
+				await executeSessionAbort(_ctx, sessionID, abortCtx)
 			}
 		} catch (err) {
 			log("[fix-lifecycle-gate] Failed to write gate metadata", { sessionID, gateId, error: err })
@@ -135,7 +149,14 @@ export function createFixLifecycleGateHook(
 				if (mcResult.reason === "coverage_insufficient") {
 					mcWarningCountMap.set(mcKey, priorWarnings + 1)
 					if (mcResult.shouldBlock) {
-						const msg = `[🛑 Methodology Coverage] 任务复杂度 ${complexity}，要求 ${mcResult.required} 维方法论覆盖，当前仅 ${mcResult.actual} 维（差 ${mcResult.deficit}）。已连续警告 ${priorWarnings + 1} 次。请补充方法论维度后再继续。`
+						const msg = buildMethodologyCoverageBlockMessage({
+							complexity,
+							required: mcResult.required,
+							actual: mcResult.actual,
+							deficit: mcResult.deficit,
+							warningCount: priorWarnings + 1,
+							dimensionsCovered: state.dimensionsCovered,
+						})
 						log("[fix-lifecycle-gate] Methodology coverage block", { sessionID, tool, complexity, required: mcResult.required, actual: mcResult.actual })
 						await writeGateBlock(sessionID, "fix-lifecycle-gate:methodology-coverage", "methodology_coverage_insufficient", msg)
 						throw new Error(msg)

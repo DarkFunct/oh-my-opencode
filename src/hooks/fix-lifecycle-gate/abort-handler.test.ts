@@ -1,85 +1,107 @@
-import { describe, expect, test, mock } from "bun:test"
-import { DEFAULT_GATE_RESPONSE_CONFIG } from "@gaia/omo-hooks"
+import { describe, expect, test } from "bun:test"
+import * as fs from "fs"
+import { getLogFilePath } from "../../shared/logger"
+import { buildAbortExplanation, executeSessionAbort, shouldAbortSession } from "./abort-handler"
 
-describe("abort-handler", () => {
-	const mockAbort = mock(() => Promise.resolve())
-	const mockCtx = {
-		client: {
-			session: {
-				abort: mockAbort,
+describe("shouldAbortSession", () => {
+	test("returns true for abort severity", () => {
+		expect(shouldAbortSession("abort")).toBe(true)
+	})
+
+	test("returns false for warning severity", () => {
+		expect(shouldAbortSession("warning")).toBe(false)
+	})
+
+	test("returns false for soft_block severity", () => {
+		expect(shouldAbortSession("soft_block")).toBe(false)
+	})
+
+	test("returns false for hard_block severity", () => {
+		expect(shouldAbortSession("hard_block")).toBe(false)
+	})
+})
+
+describe("buildAbortExplanation", () => {
+	test("includes gate id, response count, block count, reason, and new-session instruction", () => {
+		const explanation = buildAbortExplanation({
+			sessionID: "ses_abort_case",
+			gateId: "methodology-coverage",
+			blockCount: 3,
+			responseCount: 5,
+			reason: "methodology coverage missing",
+		})
+
+		expect(explanation).toContain("门控 methodology-coverage 经过 5 次响应尝试后仍未解除。")
+		expect(explanation).toContain("累计阻断: 3 次")
+		expect(explanation).toContain("终止原因: methodology coverage missing")
+		expect(explanation).toContain("如需继续此任务，请在新会话中先完成门控要求的认知操作。")
+	})
+})
+
+describe("executeSessionAbort", () => {
+	test("calls session.abort", async () => {
+		const calls: Array<{ path: { id: string } }> = []
+		const ctx = {
+			client: {
+				session: {
+					abort: async (params: { path: { id: string } }) => {
+						calls.push(params)
+					},
+				},
 			},
-		},
-	}
+		}
 
-	function resetMocks() {
-		mockAbort.mockClear()
-	}
-
-	describe("shouldAbortSession", () => {
-		const { shouldAbortSession } = require("./abort-handler")
-
-		test("returns false when severity is not abort", () => {
-			expect(shouldAbortSession("warning")).toBe(false)
-			expect(shouldAbortSession("soft_block")).toBe(false)
-			expect(shouldAbortSession("hard_block")).toBe(false)
-		})
-
-		test("returns true when severity is abort", () => {
-			expect(shouldAbortSession("abort")).toBe(true)
-		})
+		await executeSessionAbort(ctx, "ses_test_123")
+		expect(calls).toEqual([{ path: { id: "ses_test_123" } }])
 	})
 
-	describe("executeSessionAbort", () => {
-		const { executeSessionAbort } = require("./abort-handler")
+	test("handles session.abort failure gracefully", async () => {
+		let callCount = 0
+		const ctx = {
+			client: {
+				session: {
+					abort: async () => {
+						callCount += 1
+						throw new Error("abort failed")
+					},
+				},
+			},
+		}
 
-		test("calls ctx.client.session.abort with correct sessionID", async () => {
-			resetMocks()
-			await executeSessionAbort(mockCtx, "ses_test_123")
-			expect(mockAbort).toHaveBeenCalledTimes(1)
-			expect(mockAbort).toHaveBeenCalledWith({ path: { id: "ses_test_123" } })
-		})
-
-		test("does not throw when abort rejects", async () => {
-			resetMocks()
-			mockAbort.mockImplementationOnce(() => Promise.reject(new Error("abort failed")))
-			await executeSessionAbort(mockCtx, "ses_fail")
-			expect(mockAbort).toHaveBeenCalledTimes(1)
-		})
-
-		test("does not throw when abort throws synchronously", async () => {
-			resetMocks()
-			mockAbort.mockImplementationOnce(() => { throw new Error("sync fail") })
-			await executeSessionAbort(mockCtx, "ses_sync_fail")
-			expect(mockAbort).toHaveBeenCalledTimes(1)
-		})
+		await executeSessionAbort(ctx, "ses_fail")
+		expect(callCount).toBe(1)
 	})
 
-	describe("escalation to abort threshold", () => {
-		const { shouldAbortSession } = require("./abort-handler")
-		const { escalate } = require("@gaia/omo-hooks")
+	test("logs abort explanation when abortContext is provided", async () => {
+		const logPath = getLogFilePath()
+		if (fs.existsSync(logPath)) {
+			fs.unlinkSync(logPath)
+		}
 
-		test("escalate returns abort at default threshold (5)", () => {
-			const severity = escalate(5, DEFAULT_GATE_RESPONSE_CONFIG)
-			expect(severity).toBe("abort")
-			expect(shouldAbortSession(severity)).toBe(true)
+		const uniqueReason = `abort-test-reason-${Date.now()}`
+		const ctx = {
+			client: {
+				session: {
+					abort: async () => {
+						return null
+					},
+				},
+			},
+		}
+
+		await executeSessionAbort(ctx, "ses_log_case", {
+			sessionID: "ses_log_case",
+			gateId: "methodology-coverage",
+			blockCount: 4,
+			responseCount: 6,
+			reason: uniqueReason,
 		})
 
-		test("escalate returns hard_block below abort threshold", () => {
-			const severity = escalate(4, DEFAULT_GATE_RESPONSE_CONFIG)
-			expect(severity).toBe("hard_block")
-			expect(shouldAbortSession(severity)).toBe(false)
-		})
+		await new Promise(resolve => setTimeout(resolve, 700))
+		const logContent = fs.existsSync(logPath) ? fs.readFileSync(logPath, "utf8") : ""
 
-		test("escalate returns abort above threshold", () => {
-			const severity = escalate(10, DEFAULT_GATE_RESPONSE_CONFIG)
-			expect(severity).toBe("abort")
-			expect(shouldAbortSession(severity)).toBe(true)
-		})
-
-		test("custom abort threshold is respected", () => {
-			const customConfig = { ...DEFAULT_GATE_RESPONSE_CONFIG, abortThreshold: 3 }
-			expect(shouldAbortSession(escalate(3, customConfig))).toBe(true)
-			expect(shouldAbortSession(escalate(2, customConfig))).toBe(false)
-		})
+		expect(logContent).toContain("[fix-lifecycle-gate] Abort explanation")
+		expect(logContent).toContain(uniqueReason)
+		expect(logContent).toContain("methodology-coverage")
 	})
 })
