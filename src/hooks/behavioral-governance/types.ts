@@ -6,6 +6,8 @@
  * F5/F6 (checkpoint & pre-compact).
  */
 
+import type { DangerousCommandConfig } from "./dangerous-command-gate"
+
 export type AuthorizationLevel = "none" | "once" | "task" | "session"
 
 export interface SourceCodeAuthorization {
@@ -43,6 +45,8 @@ export interface GovernanceConfig {
 	cognitiveMarkersThreshold: number
 	/** Source code path patterns to protect */
 	protectedPathPatterns: RegExp[]
+	/** SC-03 dangerous command gate config */
+	dangerousCommandConfig?: DangerousCommandConfig
 }
 
 export const DEFAULT_GOVERNANCE_CONFIG: GovernanceConfig = {

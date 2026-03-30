@@ -103,6 +103,79 @@ export const CognitiveGovernanceCausalAnalysisSchema = z.object({
 	enabled: z.boolean().default(true),
 	ca_trigger_failures: z.number().int().min(1).max(5).default(2),
 	ca_required_reads_before_retry: z.number().int().min(1).max(10).default(3),
+	include_counterfactual: z.boolean().default(true),
+	include_boundary_closure: z.boolean().default(true),
+})
+
+export const CognitiveGovernanceSecretScanSchema = z.object({
+	enabled: z.boolean().default(true),
+	default_patterns_enabled: z.boolean().default(true),
+	custom_patterns: z.array(z.object({
+		type: z.string(),
+		pattern: z.string(),
+	})).default([]),
+	test_file_patterns: z.array(z.string()).default([
+		"**/test/**", "**/*.test.*", "**/mock/**", "**/fixture/**",
+	]),
+	placeholder_values: z.array(z.string()).default([
+		"placeholder", "xxx", "your-key-here", "changeme", "TODO",
+	]),
+	env_file_patterns: z.array(z.string()).default([
+		"**/.env", "**/.env.*",
+	]),
+})
+
+export const CognitiveGovernanceDangerousCommandSchema = z.object({
+	enabled: z.boolean().default(true),
+	default_patterns_enabled: z.boolean().default(true),
+	custom_patterns: z.array(z.object({
+		category: z.string(),
+		pattern: z.string(),
+		severity: z.enum(["critical", "high"]),
+	})).default([]),
+	safe_rm_paths: z.array(z.string()).default([
+		"dist/", "build/", "node_modules/", ".next/", "coverage/", "tmp/", ".cache/",
+	]),
+})
+
+export const CognitiveGovernanceComplexityThresholdsSchema = z.object({
+	complex_module_count: z.number().int().min(1).default(3),
+	complex_todo_count: z.number().int().min(1).default(8),
+	complex_file_count: z.number().int().min(1).default(10),
+	standard_module_count: z.number().int().min(1).default(2),
+	standard_todo_count: z.number().int().min(1).default(3),
+	standard_file_count: z.number().int().min(1).default(4),
+})
+
+export const CognitiveGovernanceMethodologyCoverageSchema = z.object({
+	enabled: z.boolean().default(true),
+	min_dimensions_simple: z.number().int().min(1).max(5).default(2),
+	min_dimensions_standard: z.number().int().min(1).max(5).default(3),
+	min_dimensions_complex: z.number().int().min(1).max(5).default(5),
+	methodology_warning_threshold: z.number().int().min(1).max(5).default(3),
+	complexity_thresholds: CognitiveGovernanceComplexityThresholdsSchema.default({
+		complex_module_count: 3,
+		complex_todo_count: 8,
+		complex_file_count: 10,
+		standard_module_count: 2,
+		standard_todo_count: 3,
+		standard_file_count: 4,
+	}),
+})
+
+export const CognitiveGovernanceBatchClassificationSchema = z.object({
+	enabled: z.boolean().default(true),
+	batch_threshold: z.number().int().min(3).max(20).default(5),
+	classification_marker_patterns: z.array(z.string()).default([
+		"^\\[.+\\]",
+		"^\\(.+\\)",
+	]),
+})
+
+export const CognitiveGovernanceRetrospectiveSchema = z.object({
+	enabled: z.boolean().default(true),
+	retrospective_threshold: z.number().int().min(2).max(10).default(4),
+	retrospective_priority: z.enum(["critical", "high", "medium"]).default("critical"),
 })
 
 export const CognitiveGovernanceConfigSchema = z.object({
@@ -122,6 +195,11 @@ export const CognitiveGovernanceConfigSchema = z.object({
 	delivery_verification: CognitiveGovernanceDeliveryVerificationSchema.optional(),
 	documentation_governance: CognitiveGovernanceDocumentationGovernanceSchema.optional(),
 	causal_analysis: CognitiveGovernanceCausalAnalysisSchema.optional(),
+	secret_scan: CognitiveGovernanceSecretScanSchema.optional(),
+	dangerous_command: CognitiveGovernanceDangerousCommandSchema.optional(),
+	methodology_coverage: CognitiveGovernanceMethodologyCoverageSchema.optional(),
+	batch_classification: CognitiveGovernanceBatchClassificationSchema.optional(),
+	retrospective: CognitiveGovernanceRetrospectiveSchema.optional(),
 })
 
 export type CognitiveGovernanceConfig = z.infer<typeof CognitiveGovernanceConfigSchema>

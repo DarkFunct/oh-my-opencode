@@ -48,6 +48,7 @@ function createDefaultState(): SessionCognitiveState {
 			codeChangesWithoutDocUpdate: 0,
 			lastDocChangeTimestamp: null,
 		},
+		lastSecretScanResult: undefined,
 	}
 }
 

@@ -1,3 +1,5 @@
+import type { SecretScanResult } from "../session-evidence-collector/secret-scanner"
+
 export type CognitiveLayer = "perception" | "understanding" | "rationality"
 
 export type MethodologyDimension =
@@ -253,4 +255,7 @@ export interface SessionCognitiveState {
 	// DV/DG evidence (L1 delivery + documentation tracking)
 	deliveryEvidence: DeliveryEvidence
 	documentationEvidence: DocumentationEvidence
+
+	// SC-02: Secret scan result from L1 evidence collector
+	lastSecretScanResult?: SecretScanResult
 }

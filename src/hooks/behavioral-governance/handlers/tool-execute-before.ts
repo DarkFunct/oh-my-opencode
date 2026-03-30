@@ -1,6 +1,7 @@
 import type { GovernanceConfig } from "../types"
 import { getSessionState, incrementBashCount, incrementReadCount } from "../state"
 import { detectSourceCodeModification } from "../source-code-detector"
+import { evaluateDangerousCommand } from "../dangerous-command-gate"
 import { buildCognitiveGatePrompt } from "../prompts/cognitive-gate"
 import { buildSourceAuthPrompt } from "../prompts/source-auth"
 import { buildExecutionRatioPrompt } from "../prompts/execution-ratio"
@@ -58,6 +59,14 @@ export function createToolExecuteBeforeHandler(config: GovernanceConfig) {
 
 			if (toolLower === "bash") {
 				const command = typeof safeArgs.command === "string" ? safeArgs.command : ""
+
+				const dangerResult = evaluateDangerousCommand(command, config.dangerousCommandConfig)
+				if (dangerResult.blocked && dangerResult.message) {
+					log("[behavioral-governance] SC-03 dangerous command blocked", {
+						sessionID: input.sessionID, category: dangerResult.category, severity: dangerResult.severity,
+					})
+					throw new Error(dangerResult.message)
+				}
 
 				if (isReadOnlyBashCommand(command) || isVerificationBashCommand(command)) {
 					incrementReadCount(input.sessionID)

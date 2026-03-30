@@ -14,15 +14,26 @@ import {
 	type DocumentationAutoManagementConfig,
 } from "./capture-doc-maintenance"
 import { isReadTool, isGrepTool, isExecuteTool, isCaptureTarget, detectMethodologyDimension, isVerifiableFile } from "./evidence-signals"
+import { scanForSecrets } from "./secret-scanner"
+import type { SecretScanConfig } from "./secret-scanner"
 import { scoreAllEvidences } from "../context-relevance-scorer"
 import { log } from "../../shared"
 
 const WRITE_TOOLS = new Set(["edit", "write", "ast_grep_replace", "lsp_rename", "apply_patch"])
 
+export interface SessionEvidenceCollectorOptions {
+	docMaintenanceConfig?: Partial<DocumentationAutoManagementConfig>
+	secretScanConfig?: SecretScanConfig
+}
+
 export function createSessionEvidenceCollectorHook(
 	ctx: PluginInput,
-	configOverrides?: Partial<DocumentationAutoManagementConfig>,
+	options?: SessionEvidenceCollectorOptions | Partial<DocumentationAutoManagementConfig>,
 ) {
+	const isLegacy = !!options && ("staleness_threshold_hours" in options || "min_edit_distance" in options)
+	const opts: SessionEvidenceCollectorOptions = isLegacy
+		? { docMaintenanceConfig: options as Partial<DocumentationAutoManagementConfig> }
+		: (options as SessionEvidenceCollectorOptions) ?? {}
 	const projectRoot = typeof ctx.directory === "string" ? ctx.directory : process.cwd()
 
 	const toolExecuteBefore = async (
@@ -57,6 +68,14 @@ export function createSessionEvidenceCollectorHook(
 			if (WRITE_TOOLS.has(normalized)) {
 				if (filePath && isVerifiableFile(filePath)) {
 					state.editsSinceLastVerification++
+				}
+				const wc = (typeof output.args.newString === "string" && output.args.newString)
+					|| (typeof output.args.content === "string" && output.args.content)
+					|| (typeof output.args.rewrite === "string" && output.args.rewrite)
+					|| (typeof output.args.patchText === "string" && output.args.patchText)
+					|| undefined
+				if (wc && filePath) {
+					state.lastSecretScanResult = scanForSecrets(wc, filePath, opts.secretScanConfig)
 				}
 			}
 
@@ -100,7 +119,7 @@ export function createSessionEvidenceCollectorHook(
 								projectRoot,
 								captureFilePath: effectiveFilePath,
 								editedFiles: state.fileEditHistory.keys(),
-								config: configOverrides,
+								config: opts.docMaintenanceConfig,
 							})
 								.then((notice) => {
 									if (notice && output) {

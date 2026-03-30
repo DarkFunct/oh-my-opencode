@@ -170,6 +170,7 @@ export function createToolGuardHooks(args: {
             pluginConfig.cognitive_governance?.behavioral_governance?.min_bash_samples_for_ratio_gate,
           cognitiveMarkersThreshold:
             pluginConfig.cognitive_governance?.behavioral_governance?.cognitive_markers_threshold,
+          dangerousCommandConfig: pluginConfig.cognitive_governance?.dangerous_command,
         }))
     : null
 
@@ -226,10 +227,13 @@ export function createToolGuardHooks(args: {
   const sessionEvidenceCollector = isHookEnabled("session-evidence-collector")
     ? safeHook("session-evidence-collector", () =>
         createSessionEvidenceCollectorHook(ctx, {
-          enabled: pluginConfig.cognitive_governance?.documentation_auto_management?.enabled,
-          docsRoot: pluginConfig.cognitive_governance?.documentation_auto_management?.docs_root,
-          registryFile: pluginConfig.cognitive_governance?.documentation_auto_management?.registry_file,
-          maxReportItems: pluginConfig.cognitive_governance?.documentation_auto_management?.max_report_items,
+          docMaintenanceConfig: {
+            enabled: pluginConfig.cognitive_governance?.documentation_auto_management?.enabled,
+            docsRoot: pluginConfig.cognitive_governance?.documentation_auto_management?.docs_root,
+            registryFile: pluginConfig.cognitive_governance?.documentation_auto_management?.registry_file,
+            maxReportItems: pluginConfig.cognitive_governance?.documentation_auto_management?.max_report_items,
+          },
+          secretScanConfig: pluginConfig.cognitive_governance?.secret_scan,
         }))
     : null
 
@@ -260,6 +264,8 @@ export function createToolGuardHooks(args: {
             hardBlockThreshold: pluginConfig.cognitive_governance?.gate_response?.hard_block_threshold,
             abortThreshold: pluginConfig.cognitive_governance?.gate_response?.abort_threshold,
           },
+          methodologyCoverageConfig: pluginConfig.cognitive_governance?.methodology_coverage,
+          batchClassificationConfig: pluginConfig.cognitive_governance?.batch_classification,
         }))
     : null
 
