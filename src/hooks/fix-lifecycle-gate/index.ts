@@ -1,4 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
+import { createGateResponse, escalate, writeGateMetadata, appendGateEvent, DEFAULT_GATE_RESPONSE_CONFIG } from "@gaia/omo-hooks"
+import type { GateResponseConfig } from "@gaia/omo-hooks"
 import { getCognitiveState, deleteCognitiveSession } from "../cognitive-governance-shared/state"
 import { extractFilePath } from "../session-evidence-collector/structural-signals"
 import { isExecuteTool } from "../session-evidence-collector/evidence-signals"
@@ -9,14 +11,47 @@ import { buildBlockMessage, buildCaptureBlockMessage } from "./prompts"
 import { log } from "../../shared"
 import type { FixLifecycleGateConfig } from "./config"
 import { DEFAULT_FIX_LIFECYCLE_GATE_CONFIG } from "./config"
+import { getGateMetadataDir } from "../gate-metadata-path"
+
+export interface FixLifecycleGateOptions {
+	configOverrides?: Partial<FixLifecycleGateConfig>
+	gateResponseConfig?: Partial<GateResponseConfig>
+}
 
 export function createFixLifecycleGateHook(
 	_ctx: PluginInput,
-	configOverrides?: Partial<FixLifecycleGateConfig>,
+	options?: FixLifecycleGateOptions | Partial<FixLifecycleGateConfig>,
 ) {
+	const opts = isLegacyConfig(options) ? { configOverrides: options } : (options ?? {})
 	const config: FixLifecycleGateConfig = {
 		...DEFAULT_FIX_LIFECYCLE_GATE_CONFIG,
-		...configOverrides,
+		...opts.configOverrides,
+	}
+	const grConfig: GateResponseConfig = {
+		...DEFAULT_GATE_RESPONSE_CONFIG,
+		...opts.gateResponseConfig,
+	}
+
+	const blockCountMap = new Map<string, number>()
+
+	function getBlockCount(sessionID: string, gateId: string): number {
+		const key = `${sessionID}:${gateId}`
+		const count = (blockCountMap.get(key) ?? 0) + 1
+		blockCountMap.set(key, count)
+		return count
+	}
+
+	async function writeGateBlock(sessionID: string, gateId: string, reason: string, recoveryAction: string): Promise<void> {
+		try {
+			const blockCount = getBlockCount(sessionID, gateId)
+			const severity = escalate(blockCount, grConfig)
+			const response = createGateResponse({ gateId, severity, reason, recoveryAction, blockCount })
+			const dir = getGateMetadataDir(sessionID)
+			await writeGateMetadata(dir, { gateResponse: response, timestamp: new Date().toISOString(), sessionId: sessionID, totalBlockCount: blockCount })
+			await appendGateEvent(dir, { sessionId: sessionID, gateId, severity, blockCount, timestamp: new Date().toISOString() })
+		} catch (err) {
+			log("[fix-lifecycle-gate] Failed to write gate metadata", { sessionID, gateId, error: err })
+		}
 	}
 
 	const toolExecuteBefore = async (
@@ -35,11 +70,9 @@ export function createFixLifecycleGateHook(
 			const cognitiveFailure = detectCognitiveFailureBlock(state, config)
 			if (cognitiveFailure) {
 				log("[fix-lifecycle-gate] Cognitive failure block", {
-					sessionID,
-					tool,
-					failureId: cognitiveFailure.id,
-					name: cognitiveFailure.name,
+					sessionID, tool, failureId: cognitiveFailure.id, name: cognitiveFailure.name,
 				})
+				await writeGateBlock(sessionID, `fix-lifecycle-gate:${cognitiveFailure.id}`, cognitiveFailure.name, cognitiveFailure.directive)
 				throw new Error(cognitiveFailure.directive)
 			}
 
@@ -51,24 +84,21 @@ export function createFixLifecycleGateHook(
 
 			if (verdict.shouldBlock) {
 				log("[fix-lifecycle-gate] Blocking repeat fix", {
-					sessionID,
-					tool,
-					reason: verdict.reason,
-					fixCount: verdict.fixCount,
-					target: verdict.target,
+					sessionID, tool, reason: verdict.reason, fixCount: verdict.fixCount, target: verdict.target,
 				})
-				throw new Error(buildBlockMessage(verdict))
+				const msg = buildBlockMessage(verdict)
+				await writeGateBlock(sessionID, `fix-lifecycle-gate:repeat-fix:${verdict.reason}`, verdict.reason, msg)
+				throw new Error(msg)
 			}
 
 			const captureVerdict = detectCaptureViolation(state, config)
 			if (captureVerdict.shouldBlock) {
 				log("[fix-lifecycle-gate] Blocking — capture overdue", {
-					sessionID,
-					tool,
-					roundsPending: captureVerdict.roundsPending,
-					editedFiles: captureVerdict.editedFiles,
+					sessionID, tool, roundsPending: captureVerdict.roundsPending, editedFiles: captureVerdict.editedFiles,
 				})
-				throw new Error(buildCaptureBlockMessage(captureVerdict))
+				const msg = buildCaptureBlockMessage(captureVerdict)
+				await writeGateBlock(sessionID, "fix-lifecycle-gate:capture-overdue", "capture_overdue", msg)
+				throw new Error(msg)
 			}
 		} catch (e) {
 			if (e instanceof Error && e.message.startsWith("[🛑")) {
@@ -91,4 +121,11 @@ export function createFixLifecycleGateHook(
 		"tool.execute.before": toolExecuteBefore,
 		event,
 	}
+}
+
+function isLegacyConfig(
+	opts: FixLifecycleGateOptions | Partial<FixLifecycleGateConfig> | undefined,
+): opts is Partial<FixLifecycleGateConfig> {
+	if (!opts) return false
+	return "repeatFixThreshold" in opts || "sameFileFixThreshold" in opts || "captureHardBlockThreshold" in opts
 }
