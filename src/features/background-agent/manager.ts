@@ -54,6 +54,8 @@ import { checkAndInterruptStaleTasks } from "./task-poller"
 import { removeTaskToastTracking } from "./remove-task-toast-tracking"
 import { isActiveSessionStatus, isTerminalSessionStatus } from "./session-status-classifier"
 import { getGateNotificationSuffix } from "./gate-info-reader"
+import { readSessionGateInfo } from "./gate-info-reader"
+import { shouldAbortForGateBlock } from "./gate-monitor"
 import {
   detectRepetitiveToolUse,
   recordToolCall,
@@ -952,6 +954,26 @@ export class BackgroundManager {
              }
            }
         }
+
+         if (task.sessionID) {
+           readSessionGateInfo(task.sessionID).then(info => {
+             if (info.gateEvents.length > 0) {
+               const gateCheck = shouldAbortForGateBlock(info.gateEvents, circuitBreaker.consecutiveThreshold)
+               if (gateCheck.triggered) {
+                 log("[background-agent] Gate monitor: consecutive gate blocks detected", {
+                   taskId: task.id,
+                   agent: task.agent,
+                   sessionID: task.sessionID,
+                   gateInfo: gateCheck.gateInfo,
+                 })
+                 void this.cancelTask(task.id, {
+                   source: "gate-block",
+                   reason: `Subagent is stuck in gate-block loop. ${gateCheck.gateInfo}. Task cancelled to prevent infinite blocking.`,
+                 })
+               }
+             }
+           }).catch(() => {})
+         }
 
         const maxToolCalls = circuitBreaker.maxToolCalls
         if (task.progress.toolCalls >= maxToolCalls) {

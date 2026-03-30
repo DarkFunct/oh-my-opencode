@@ -12,6 +12,7 @@ import { log } from "../../shared"
 import type { FixLifecycleGateConfig } from "./config"
 import { DEFAULT_FIX_LIFECYCLE_GATE_CONFIG } from "./config"
 import { getGateMetadataDir } from "../gate-metadata-path"
+import { shouldAbortSession, executeSessionAbort } from "./abort-handler"
 
 export interface FixLifecycleGateOptions {
 	configOverrides?: Partial<FixLifecycleGateConfig>
@@ -49,6 +50,10 @@ export function createFixLifecycleGateHook(
 			const dir = getGateMetadataDir(sessionID)
 			await writeGateMetadata(dir, { gateResponse: response, timestamp: new Date().toISOString(), sessionId: sessionID, totalBlockCount: blockCount })
 			await appendGateEvent(dir, { sessionId: sessionID, gateId, severity, blockCount, timestamp: new Date().toISOString() })
+			if (shouldAbortSession(severity)) {
+				log("[fix-lifecycle-gate] Abort threshold reached — terminating session", { sessionID, gateId, blockCount })
+				await executeSessionAbort(_ctx, sessionID)
+			}
 		} catch (err) {
 			log("[fix-lifecycle-gate] Failed to write gate metadata", { sessionID, gateId, error: err })
 		}
