@@ -2,6 +2,7 @@ import type { BuildSystemContentInput } from "./types"
 import { buildPlanAgentSystemPrepend, isPlanAgent } from "./constants"
 import { buildSystemContentWithTokenLimit } from "./token-limiter"
 import { getMethodologyChainInjection, hasMethodologyChainInjection } from "./methodology-chain-inject"
+import { getGateProtocolInjection, hasGateProtocolInjection } from "./gate-protocol-inject"
 
 const FREE_OR_LOCAL_PROMPT_TOKEN_LIMIT = 24000
 const PLAN_AGENT_PROMPT_APPEND = `
@@ -51,14 +52,20 @@ export function buildSystemContent(input: BuildSystemContentInput): string | und
     ?? (usesFreeOrLocalModel(model) ? FREE_OR_LOCAL_PROMPT_TOKEN_LIMIT : undefined)
 
   const chainInjection = getMethodologyChainInjection()
+  const gateProtocol = getGateProtocolInjection()
   const existingContent = [skillContent, ...(skillContents ?? []), categoryPromptAppend, agentsContext]
     .filter(Boolean)
     .join("")
   const shouldInjectChain = !hasMethodologyChainInjection(existingContent)
-  const finalCategoryPromptAppend = shouldInjectChain
+  const shouldInjectGate = !hasGateProtocolInjection(existingContent)
+  const injections = [
+    shouldInjectChain ? chainInjection : "",
+    shouldInjectGate ? gateProtocol : "",
+  ].filter(Boolean).join("\n\n")
+  const finalCategoryPromptAppend = injections
     ? categoryPromptAppend
-      ? `${categoryPromptAppend}\n\n${chainInjection}`
-      : chainInjection
+      ? `${categoryPromptAppend}\n\n${injections}`
+      : injections
     : categoryPromptAppend
 
   return buildSystemContentWithTokenLimit(
