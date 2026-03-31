@@ -2930,13 +2930,15 @@ describe("sisyphus-task", () => {
   })
 
   describe("buildSystemContent", () => {
-    test("returns methodology chain when no skills and no category promptAppend", () => {
+    test("returns methodology chain and gate protocol when no skills and no category promptAppend", () => {
       const { buildSystemContent } = require("./tools")
       const { getMethodologyChainInjection } = require("./methodology-chain-inject")
+      const { getGateProtocolInjection } = require("./gate-protocol-inject")
 
       const result = buildSystemContent({ skillContent: undefined, categoryPromptAppend: undefined })
 
-      expect(result).toBe(getMethodologyChainInjection())
+      expect(result).toContain(getMethodologyChainInjection())
+      expect(result).toContain(getGateProtocolInjection())
     })
 
     test("includes skill content and methodology chain when skills provided without category", () => {

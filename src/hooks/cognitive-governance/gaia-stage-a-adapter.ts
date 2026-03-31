@@ -33,7 +33,8 @@ export function evaluateGaiaStageAFromThinking(
 	options?: GaiaStageAEvaluationOptions,
 ): GaiaStageAResult | null {
 	const normalized = thinkingContent.trim()
-	if (!normalized) return null
+	const hasPerceptionDefaults = options?.includePerceptionDefaults !== false
+	if (!normalized && !hasPerceptionDefaults) return null
 
 	const result = evaluateCognitiveSignals(normalized, registry, options)
 	return {

@@ -12,6 +12,7 @@ import { CommentCheckerConfigSchema } from "./comment-checker"
 import { BuiltinCommandNameSchema } from "./commands"
 import { ExperimentalConfigSchema } from "./experimental"
 import { GitMasterConfigSchema } from "./git-master"
+import { KGSGuardConfigSchema } from "./kgs-guard"
 import { KGSSyncConfigSchema } from "./kgs-sync"
 import { NotificationConfigSchema } from "./notification"
 import { OpenClawConfigSchema } from "./openclaw"
@@ -64,6 +65,7 @@ export const OhMyOpenCodeConfigSchema = z.object({
   git_master: GitMasterConfigSchema.optional(),
   browser_automation_engine: BrowserAutomationConfigSchema.optional(),
   websearch: WebsearchConfigSchema.optional(),
+  kgs_guard: KGSGuardConfigSchema.optional(),
   kgs_sync: KGSSyncConfigSchema.optional(),
   tmux: TmuxConfigSchema.optional(),
   sisyphus: SisyphusConfigSchema.optional(),

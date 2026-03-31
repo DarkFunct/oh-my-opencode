@@ -13,7 +13,7 @@ import {
 	evaluateGaiaStageAFromThinking,
 	type GaiaStageAEvaluationOptions,
 } from "./gaia-stage-a-adapter"
-import { extractAssistantThinkingTrace } from "./thinking-trace-extractor"
+import { extractAssistantThinkingTrace, extractAssistantTextContent } from "./thinking-trace-extractor"
 import { extractLatestStageBVerdict } from "./stage-b-verdict-parser"
 import { buildStageBReviewRequest, shouldRequestStageBReview } from "./stage-b-review-request"
 import { buildCognitiveDirective } from "./prompts"
@@ -54,17 +54,21 @@ export function createCognitiveGovernanceHook(
 			const state = getCognitiveState(sessionID)
 			let stageAVerdict: CognitiveReviewVerdictInput | null = null
 			const thinkingTrace = extractAssistantThinkingTrace(output.messages)
-			if (thinkingTrace) {
-				const stageA = evaluateGaiaStageAFromThinking(thinkingTrace, stageAOptions)
+			const evaluationContent = thinkingTrace
+				?? extractAssistantTextContent(output.messages)
+				?? ""
+
+			if (evaluationContent || stageAOptions?.includePerceptionDefaults !== false) {
+				const stageA = evaluateGaiaStageAFromThinking(evaluationContent, stageAOptions)
 				if (stageA) {
 					stageAVerdict = stageA.verdict
 					for (const dimension of stageA.dimensionsCovered) {
 						state.dimensionsCovered.add(dimension)
 					}
 
-					const evidenceSignal = thinkingTrace.length > 600
-						? `${thinkingTrace.slice(0, 600)}...`
-						: thinkingTrace
+					const evidenceSignal = evaluationContent.length > 600
+						? `${evaluationContent.slice(0, 600)}...`
+						: evaluationContent
 					state.cognitiveEvidence = stageA.dimensionsCovered.map((dimension) => ({
 						layer: stageA.layer,
 						dimension,

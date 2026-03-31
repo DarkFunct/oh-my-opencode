@@ -4749,6 +4749,21 @@
       },
       "additionalProperties": false
     },
+    "kgs_guard": {
+      "type": "object",
+      "properties": {
+        "write_debounce_ms": {
+          "default": 10000,
+          "type": "integer",
+          "minimum": 1000,
+          "maximum": 60000
+        }
+      },
+      "required": [
+        "write_debounce_ms"
+      ],
+      "additionalProperties": false
+    },
     "kgs_sync": {
       "type": "object",
       "properties": {

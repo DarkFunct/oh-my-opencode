@@ -175,7 +175,9 @@ export function createToolGuardHooks(args: {
     : null
 
   const kgsGuard = isHookEnabled("kgs-guard")
-    ? safeHook("kgs-guard", () => createKGSGuardHook(ctx))
+    ? safeHook("kgs-guard", () => createKGSGuardHook(ctx, {
+        write_debounce_ms: pluginConfig.kgs_guard?.write_debounce_ms,
+      }))
     : null
 
   const methodologyPhaseTracker = isHookEnabled("methodology-phase-tracker")
