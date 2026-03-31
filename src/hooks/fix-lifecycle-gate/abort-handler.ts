@@ -1,5 +1,6 @@
 import type { GateSeverity } from "@gaia/omo-hooks"
 import { log } from "../../shared"
+import { INJECTION_PROMPT } from "../../config/gate-prompts"
 
 export function shouldAbortSession(severity: GateSeverity): boolean {
 	return severity === "abort"
@@ -14,15 +15,7 @@ export interface AbortContext {
 }
 
 export function buildAbortExplanation(ctx: AbortContext): string {
-	return [
-		"[🛑 Session Abort — 终止说明]",
-		"",
-		`门控 ${ctx.gateId} 经过 ${ctx.responseCount} 次响应尝试后仍未解除。`,
-		`累计阻断: ${ctx.blockCount} 次`,
-		`终止原因: ${ctx.reason}`,
-		"",
-		"如需继续此任务，请在新会话中先完成门控要求的认知操作。",
-	].join("\n")
+	return INJECTION_PROMPT.sessionAbortExplanation(ctx.gateId, ctx.responseCount, ctx.blockCount, ctx.reason)
 }
 
 export async function executeSessionAbort(

@@ -28,7 +28,7 @@ describe("cognitive-governance prompts", () => {
 			pendingVerificationEditsCount: 0,
 		}))
 
-		expect(directive ?? "").not.toContain("验证提醒")
+		expect(directive ?? "").not.toContain("Verification Reminder")
 	})
 
 	test("emits verification reminder when pending verifiable edits exist", () => {
@@ -37,7 +37,7 @@ describe("cognitive-governance prompts", () => {
 		}))
 
 		expect(directive).toBeTruthy()
-		expect(directive?.includes("验证提醒")).toBe(true)
-		expect(directive?.includes("2 次可验证编辑")).toBe(true)
+		expect(directive?.includes("Verification Reminder")).toBe(true)
+		expect(directive?.includes("2 verifiable edit(s)")).toBe(true)
 	})
 })

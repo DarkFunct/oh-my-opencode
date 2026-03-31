@@ -48,7 +48,7 @@ describe("pre-flight cognitive review gate", () => {
 				{ tool: "edit", sessionID, callID: "call-pending" },
 				{ args: { filePath: "src/main.ts" } },
 			),
-		).rejects.toThrow("[Cognitive Review Gate]")
+		).rejects.toThrow("[🛑 Cognitive Review Gate]")
 	})
 
 	test("blocks execute when verdict is fail", async () => {
@@ -78,7 +78,7 @@ describe("pre-flight cognitive review gate", () => {
 				{ tool: "write", sessionID, callID: "call-fail" },
 				{ args: { filePath: "src/main.ts", content: "x" } },
 			),
-		).rejects.toThrow("[Cognitive Review Gate]")
+		).rejects.toThrow("[🛑 Cognitive Review Gate]")
 	})
 
 	test("allows execute when verdict is pass", async () => {
@@ -138,6 +138,6 @@ describe("pre-flight cognitive review gate", () => {
 				{ tool: "edit", sessionID, callID: "call-stage-b-fail" },
 				{ args: { filePath: "src/main.ts" } },
 			),
-		).rejects.toThrow("[Cognitive Review Gate]")
+		).rejects.toThrow("[🛑 Cognitive Review Gate]")
 	})
 })

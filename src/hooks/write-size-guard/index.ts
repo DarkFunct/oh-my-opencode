@@ -1,5 +1,6 @@
 import type { PluginInput } from "@opencode-ai/plugin"
 import { log } from "../../shared"
+import { GATE_PROMPT } from "../../config/gate-prompts"
 
 export interface WriteSizeGuardConfig {
 	maxLines: number
@@ -46,19 +47,7 @@ export function createWriteSizeGuardHook(
 			maxLines: config.maxLines,
 		})
 
-		throw new Error(
-			[
-				"[🛑 Write Size Guard] 写入内容超出行数限制",
-				"",
-				`当前行数: ${lineCount}，最大允许: ${config.maxLines}`,
-				"",
-				"必须执行分段写入策略:",
-				"1. 将内容拆分为多个 < " + config.maxLines + " 行的片段",
-				"2. 第一次使用 Write 写入文件基础部分",
-				"3. 后续使用 Edit 追加剩余内容",
-				"4. 每次操作后验证文件完整性",
-			].join("\n"),
-		)
+		throw new Error(GATE_PROMPT.writeSizeBlock(lineCount, config.maxLines))
 	}
 
 	return {

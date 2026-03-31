@@ -20,13 +20,13 @@ interface PrioritizedBlock {
 }
 
 function blockPriority(block: string): number {
-	if (/🚨|严重逾期|即将被拦截/i.test(block)) return 100
-	if (/\[Stage B 认知复核请求\]/i.test(block)) return 95
-	if (/未解决错误|修复尝试/i.test(block)) return 90
-	if (/验证提醒|改而不验/i.test(block)) return 85
-	if (/方法论覆盖不足/i.test(block)) return 80
-	if (/Capture 阶段逾期/i.test(block)) return 75
-	if (/Capture 提醒/i.test(block)) return 70
+	if (/🚨|CRITICALLY Overdue|Block Imminent|严重逾期|即将被拦截/i.test(block)) return 100
+	if (/\[Stage B|Cognitive Review Request|认知复核请求/i.test(block)) return 95
+	if (/Unresolved Errors|Fix attempts|未解决错误|修复尝试/i.test(block)) return 90
+	if (/Verification Reminder|验证提醒|改而不验/i.test(block)) return 85
+	if (/Coverage Insufficient|方法论覆盖不足/i.test(block)) return 80
+	if (/Capture Phase Overdue|Capture 阶段逾期/i.test(block)) return 75
+	if (/Capture Reminder|Capture Nudge|Capture 提醒/i.test(block)) return 70
 	return 50
 }
 

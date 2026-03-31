@@ -479,7 +479,7 @@ describe("failure-directives (F2/F3-warn/F4)", () => {
 		const warn = detectCognitiveFailureWarn(state)
 		expect(warn).not.toBeNull()
 		expect(warn).toContain("F4")
-		expect(warn).toContain("知识库")
+		expect(warn).toContain("knowledge base")
 		deleteCognitiveSession("test-f4-warn-1")
 	})
 

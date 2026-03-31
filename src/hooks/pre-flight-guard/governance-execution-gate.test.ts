@@ -140,7 +140,7 @@ describe("pre-flight governance execution gate", () => {
           { tool: "edit", sessionID: "ses_hephaestus", callID: "call-1" },
           { args: { filePath: "src/main.ts" } },
         ),
-      ).rejects.toThrow("[Governance Boot Gate]")
+      ).rejects.toThrow("[🛑 Governance Boot Gate]")
     } finally {
       fetchMock.restore()
     }

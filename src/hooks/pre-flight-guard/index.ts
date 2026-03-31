@@ -19,6 +19,7 @@ import { runGovernanceBootGate } from "../shared/governance-boot-gate"
 import {
 	clearGovernanceSessionValidation,
 } from "../shared/governance-session-state"
+import { GATE_PROMPT } from "../../config/gate-prompts"
 
 const READ_TOOLS = new Set([
 	"read", "glob", "grep", "ast_grep_search",
@@ -88,7 +89,7 @@ export function createPreFlightGuardHook(
 				})
 
 				if (bootGate.status === "failed") {
-					governanceBlockMessage = bootGate.message ?? "[Governance Boot Gate] 启动阶段治理校验失败"
+					governanceBlockMessage = bootGate.message ?? GATE_PROMPT.governanceBootFailure("Startup governance check returned failure status")
 				}
 			}
 
@@ -127,22 +128,7 @@ export function createPreFlightGuardHook(
 			throw new Error(governanceBlockMessage)
 		}
 
-		throw new Error(
-			[
-				"[Pre-flight Guard] 执行操作被拦截",
-				"",
-				"检测到直接执行修改操作，但尚未完成 Read 阶段。",
-				"方法论链要求：Read(阅读) → Plan(方案) → Execute(执行)",
-				"",
-				"在修改代码前，请先：",
-				"1. 使用 Read/Glob/Grep/LSP 工具阅读相关文件",
-				"2. 理解当前代码状态和上下文",
-				"3. 制定修改方案",
-				"4. 然后再执行修改",
-				"",
-				"此拦截仅触发一次，后续操作不会重复阻断。",
-			].join("\n"),
-		)
+		throw new Error(GATE_PROMPT.preFlightReadBlock())
 	}
 
 	const event = async ({ event }: { event: { type: string; properties?: unknown } }): Promise<void> => {

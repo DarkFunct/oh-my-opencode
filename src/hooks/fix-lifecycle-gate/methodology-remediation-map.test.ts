@@ -29,14 +29,14 @@ describe("buildRemediationGuide", () => {
 
 	test("contains description and read targets for one missing dimension", () => {
 		const guide = buildRemediationGuide(["technical"])
-		expect(guide).toContain("### technical: 技术维度 — 工具、编译、类型检查")
-		expect(guide).toContain("tsconfig.json / package.json（项目配置）")
-		expect(guide).toContain("运行 lsp_diagnostics / typecheck / build 验证编译结果")
+		expect(guide).toContain("### technical: Technical — tools, compilation, type checking")
+		expect(guide).toContain("tsconfig.json / package.json (project configuration)")
+		expect(guide).toContain("Run lsp_diagnostics / typecheck / build to verify compilation results")
 	})
 
 	test("contains descriptions for multiple missing dimensions", () => {
 		const guide = buildRemediationGuide(["empirical", "engineering"])
-		expect(guide).toContain("### empirical: 经验维度 — 观察、实验、复现")
-		expect(guide).toContain("### engineering: 工程维度 — 风险、边界、依赖、约束")
+		expect(guide).toContain("### empirical: Empirical — observation, experimentation, reproduction")
+		expect(guide).toContain("### engineering: Engineering — risk, boundaries, dependencies, constraints")
 	})
 })

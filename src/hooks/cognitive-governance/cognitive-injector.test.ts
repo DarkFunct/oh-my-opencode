@@ -12,25 +12,25 @@ function textPart(text: string): Part {
 describe("cognitive-injector", () => {
 	test("composes directive by priority before truncation", () => {
 		const directive = [
-			"[Harness 认知治理 — 当前状态]",
-			"认知层级: 悟性层 (Understanding)",
-			"方法论覆盖: technical, empirical",
+			"[Harness Cognitive Governance — Current State]",
+			"Cognitive layer: Understanding Layer",
+			"Methodology coverage: technical, empirical",
 			"",
-			"📝 Capture 提醒",
-			"低优先级提醒",
+			"📝 Capture Reminder",
+			"Low priority reminder",
 			"",
-			"🚨 **Capture 阶段严重逾期 — 即将被拦截**",
-			"高优先级拦截动作",
+			"🚨 **Capture Phase CRITICALLY Overdue — Block Imminent**",
+			"High priority block action",
 			"",
-			"[Stage B 认知复核请求]",
-			"请输出结构化复核结论",
+			"[Stage B Cognitive Review Request]",
+			"Output structured review conclusion",
 		].join("\n")
 
-		const result = composeDirectiveWithinBudget(directive, 160)
+		const result = composeDirectiveWithinBudget(directive, 220)
 
-		expect(result.length).toBeLessThanOrEqual(160)
-		expect(result).toContain("🚨 **Capture 阶段严重逾期 — 即将被拦截**")
-		expect(result).not.toContain("📝 Capture 提醒")
+		expect(result.length).toBeLessThanOrEqual(220)
+		expect(result).toContain("🚨 **Capture Phase CRITICALLY Overdue — Block Imminent**")
+		expect(result).not.toContain("📝 Capture Reminder")
 	})
 
 	test("injects synthetic directive before last user text part", () => {
@@ -41,7 +41,7 @@ describe("cognitive-injector", () => {
 			},
 		]
 
-		const ok = injectCognitiveDirective(messages, "ses_1", "[Harness]\n\n📋 验证提醒", 120)
+		const ok = injectCognitiveDirective(messages, "ses_1", "[Harness]\n\n📋 Verification Reminder", 120)
 
 		expect(ok).toBe(true)
 		expect(messages[0].parts.length).toBe(2)
@@ -59,14 +59,14 @@ describe("cognitive-injector", () => {
 
 	test("can disable omission notice for priority pruning mode", () => {
 		const directive = [
-			"[Harness 认知治理 — 当前状态]",
-			"认知层级: 悟性层 (Understanding)",
+			"[Harness Cognitive Governance — Current State]",
+			"Cognitive layer: Understanding Layer",
 			"",
-			"📝 Capture 提醒",
-			"低优先级提醒",
+			"📝 Capture Reminder",
+			"Low priority reminder",
 			"",
-			"🚨 **Capture 阶段严重逾期 — 即将被拦截**",
-			"高优先级拦截动作",
+			"🚨 **Capture Phase CRITICALLY Overdue — Block Imminent**",
+			"High priority block action",
 		].join("\n")
 
 		const result = composeDirectiveWithinBudget(directive, 120, false)
@@ -76,14 +76,14 @@ describe("cognitive-injector", () => {
 
 	test("supports legacy truncate mode via injection config", () => {
 		const directive = [
-			"[Harness 认知治理 — 当前状态]",
-			"认知层级: 悟性层 (Understanding)",
+			"[Harness Cognitive Governance — Current State]",
+			"Cognitive layer: Understanding Layer",
 			"",
-			"📝 Capture 提醒",
-			"低优先级提醒",
+			"📝 Capture Reminder",
+			"Low priority reminder",
 			"",
-			"🚨 **Capture 阶段严重逾期 — 即将被拦截**",
-			"高优先级拦截动作",
+			"🚨 **Capture Phase CRITICALLY Overdue — Block Imminent**",
+			"High priority block action",
 		].join("\n")
 
 		const priorityMessages = [
@@ -93,14 +93,14 @@ describe("cognitive-injector", () => {
 			{ info: { id: "msg_user_3", role: "user", sessionID: "ses_3" }, parts: [textPart("继续")] },
 		]
 
-		injectCognitiveDirective(priorityMessages, "ses_2", directive, 120, { mode: "priority_prune" })
-		injectCognitiveDirective(legacyMessages, "ses_3", directive, 120, { mode: "legacy_truncate" })
+		injectCognitiveDirective(priorityMessages, "ses_2", directive, 180, { mode: "priority_prune" })
+		injectCognitiveDirective(legacyMessages, "ses_3", directive, 180, { mode: "legacy_truncate" })
 
 		const priorityText = (priorityMessages[0].parts[0] as { text?: string }).text ?? ""
 		const legacyText = (legacyMessages[0].parts[0] as { text?: string }).text ?? ""
 
-		expect(priorityText).toContain("🚨 **Capture 阶段严重逾期 — 即将被拦截**")
-		expect(legacyText).toContain("📝 Capture 提醒")
+		expect(priorityText).toContain("🚨 **Capture Phase CRITICALLY Overdue — Block Imminent**")
+		expect(legacyText).toContain("📝 Capture Reminder")
 	})
 
 	test("keeps full directive when budget is disabled", () => {

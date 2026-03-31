@@ -16,6 +16,7 @@ import { evaluateBatchClassification, DEFAULT_BATCH_CLASSIFICATION_CONFIG } from
 import type { BatchClassificationConfig } from "./batch-classification-gate"
 import { buildBlockMessage, buildCaptureBlockMessage } from "./prompts"
 import { buildMethodologyCoverageBlockMessage } from "./methodology-coverage-prompts"
+import { GATE_PROMPT } from "../../config/gate-prompts"
 import { log } from "../../shared"
 import type { FixLifecycleGateConfig } from "./config"
 import { DEFAULT_FIX_LIFECYCLE_GATE_CONFIG } from "./config"
@@ -105,7 +106,7 @@ export function createFixLifecycleGateHook(
 				const contents = todos.map((t: { content?: string }) => t.content ?? "")
 				const bcResult = evaluateBatchClassification(contents, bcConfig)
 				if (bcResult.shouldBlock) {
-					const msg = `[🛑 Batch Classification] ${bcResult.itemCount} todo 项超过阈值 ${bcResult.threshold}，但多数缺少分类标记。请为每项添加 [类别] 或 (类别) 前缀。`
+					const msg = GATE_PROMPT.batchClassificationBlock(bcResult.itemCount, bcResult.threshold)
 					log("[fix-lifecycle-gate] Batch classification block", { sessionID, itemCount: bcResult.itemCount })
 					await writeGateBlock(sessionID, "fix-lifecycle-gate:batch-unclassified", "batch_unclassified", msg)
 					throw new Error(msg)

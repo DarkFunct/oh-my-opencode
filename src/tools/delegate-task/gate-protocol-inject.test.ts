@@ -15,10 +15,10 @@ describe("gate-protocol-inject", () => {
 		expect(result).toContain("</gate-response-protocol>")
 	})
 
-	test("includes Chinese gate instructions", () => {
+	test("includes English gate instructions", () => {
 		const result = getGateProtocolInjection()
 
-		expect(result).toContain("门控响应协议")
+		expect(result).toContain("Gate Response Protocol")
 		expect(result).toContain("🛑")
 	})
 

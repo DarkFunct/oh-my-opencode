@@ -15,10 +15,10 @@ describe("buildMethodologyCoverageBlockMessage", () => {
 			dimensionsCovered: new Set(["technical"]),
 		})
 
-		expect(message).toContain("任务复杂度 standard，要求 3 维方法论覆盖，当前仅 1 维（差 2）。")
-		expect(message).toContain("已覆盖维度: technical")
-		expect(message).toContain("缺失维度: empirical, theoretical, engineering, philosophical")
-		expect(message).toContain("已连续警告: 2 次")
+		expect(message).toContain("Task complexity: standard. Required: 3 methodology dimensions, current: only 1 (deficit: 2).")
+		expect(message).toContain("Covered dimensions: technical")
+		expect(message).toContain("Missing dimensions: empirical, theoretical, engineering, philosophical")
+		expect(message).toContain("Consecutive warnings: 2")
 	})
 
 	test("contains remediation guide for missing dimensions", () => {
@@ -31,10 +31,10 @@ describe("buildMethodologyCoverageBlockMessage", () => {
 			dimensionsCovered: new Set(["technical", "theoretical", "engineering"]),
 		})
 
-		expect(message).toContain("**缺失维度与解除步骤：**")
-		expect(message).toContain("### empirical: 经验维度 — 观察、实验、复现")
-		expect(message).toContain("### philosophical: 哲学维度 — 元认知、前提质疑、权衡")
-		expect(message).toContain("完成以上任意缺失维度的操作后，门控将自动解除。")
+		expect(message).toContain("**Missing Dimensions & Unblock Steps:**")
+		expect(message).toContain("### empirical: Empirical — observation, experimentation, reproduction")
+		expect(message).toContain("### philosophical: Philosophical — meta-cognition, premise questioning, tradeoffs")
+		expect(message).toContain("Complete ANY missing dimension's actions above to automatically unblock this gate.")
 	})
 })
 
@@ -50,9 +50,9 @@ describe("buildMethodologyCoverageAbortMessage", () => {
 			dimensionsCovered: new Set(["technical", "empirical"]),
 		})
 
-		expect(message).toContain("经过 7 次响应尝试，方法论覆盖仍未满足要求。")
-		expect(message).toContain("已覆盖: technical, empirical")
-		expect(message).toContain("仍缺失: theoretical, engineering, philosophical")
-		expect(message).toContain("Session 即将终止。如需继续，请在新会话中先完成缺失维度的认知操作。")
+		expect(message).toContain("After 7 response attempts, methodology coverage still does not meet requirements.")
+		expect(message).toContain("Covered: technical, empirical")
+		expect(message).toContain("Still missing: theoretical, engineering, philosophical")
+		expect(message).toContain("Session will terminate. To continue, start a new session and complete the missing cognitive dimensions FIRST.")
 	})
 })

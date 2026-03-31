@@ -31,10 +31,10 @@ describe("buildAbortExplanation", () => {
 			reason: "methodology coverage missing",
 		})
 
-		expect(explanation).toContain("门控 methodology-coverage 经过 5 次响应尝试后仍未解除。")
-		expect(explanation).toContain("累计阻断: 3 次")
-		expect(explanation).toContain("终止原因: methodology coverage missing")
-		expect(explanation).toContain("如需继续此任务，请在新会话中先完成门控要求的认知操作。")
+		expect(explanation).toContain("Gate methodology-coverage was NOT resolved after 5 response attempts.")
+		expect(explanation).toContain("Total blocks: 3")
+		expect(explanation).toContain("Termination reason: methodology coverage missing")
+		expect(explanation).toContain("To continue this task, start a new session and complete the gate-required cognitive operations FIRST.")
 	})
 })
 

@@ -8,6 +8,7 @@ import {
   markGovernanceBootGateState,
   type GovernanceBootGateState,
 } from "./governance-session-state"
+import { GATE_PROMPT } from "../../config/gate-prompts"
 
 interface RuntimePolicySnapshot {
   version?: string
@@ -25,13 +26,8 @@ export interface GovernanceBootGateInput {
   sessionID: string
 }
 
-function buildBootFailure(message: string): string {
-  return [
-    "[Governance Boot Gate] 启动阶段治理校验失败",
-    "",
-    message,
-    "请先修复 Gaia runtime policy 配置后再执行写操作。",
-  ].join("\n")
+function buildBootFailure(detail: string): string {
+  return GATE_PROMPT.governanceBootFailure(detail)
 }
 
 function isSnapshotValid(snapshot: RuntimePolicySnapshot | undefined): snapshot is RuntimePolicySnapshot {
